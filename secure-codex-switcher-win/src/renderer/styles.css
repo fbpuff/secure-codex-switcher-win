@@ -98,6 +98,7 @@
   display: none !important;
 }
 
+body.view-settings #accounts-view,
 body.view-settings #accounts-topbar,
 body.view-settings #metrics-strip,
 body.view-settings #accounts-workspace {
@@ -404,14 +405,19 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   height: 100vh;
   overflow: hidden;
 }
 
-body.view-settings .workspace {
-  grid-template-rows: minmax(0, 1fr);
+.accounts-view {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .topbar {
@@ -495,7 +501,7 @@ body.view-settings .workspace {
 
 .metrics-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
+  grid-template-columns: repeat(3, minmax(156px, 1fr)) minmax(220px, 1.05fr);
   gap: 12px;
   padding: 0 30px 18px;
 }
@@ -537,6 +543,30 @@ body.view-settings .workspace {
   align-items: center;
   cursor: pointer;
   line-height: 1.25;
+}
+
+.toggle-stack {
+  display: grid;
+  align-content: center;
+  gap: 9px;
+  min-height: 72px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 11px 14px;
+}
+
+.toggle-stack .toggle-card {
+  min-height: 26px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.toggle-stack .toggle-card + .toggle-card {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 9px;
 }
 
 .toggle-card input {
@@ -700,6 +730,52 @@ body.view-settings .workspace {
   background: var(--surface);
   color: var(--ink);
   padding: 0 10px;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.segmented-control label {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 36px;
+  place-items: center;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+}
+
+.segmented-control label:last-child {
+  border-right: 0;
+}
+
+.segmented-control input {
+  position: absolute;
+  opacity: 0;
+}
+
+.segmented-control span {
+  min-width: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segmented-control label:has(input:checked) {
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .inline-input {

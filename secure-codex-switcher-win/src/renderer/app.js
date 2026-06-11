@@ -19,6 +19,7 @@ const replacementConfirm = document.querySelector("#replacement-confirm");
 const languageSelect = document.querySelector("#language-select");
 const accountsNav = document.querySelector("#accounts-nav");
 const settingsNav = document.querySelector("#settings-nav");
+const accountsView = document.querySelector("#accounts-view");
 const accountsTopbar = document.querySelector("#accounts-topbar");
 const metricsStrip = document.querySelector("#metrics-strip");
 const accountsWorkspace = document.querySelector("#accounts-workspace");
@@ -28,7 +29,7 @@ const settingsAutoSwitch = document.querySelector("#settings-auto-switch");
 const settingsLowQuotaWarning = document.querySelector("#settings-low-quota-warning");
 const settingsRequireSwitchConfirmation = document.querySelector("#settings-require-switch-confirmation");
 const settingsRefreshInterval = document.querySelector("#settings-refresh-interval");
-const settingsTheme = document.querySelector("#settings-theme");
+const settingsThemeInputs = document.querySelectorAll('input[name="settings-theme"]');
 const settingsOpenFolder = document.querySelector("#settings-open-folder");
 const closeDialog = document.querySelector("#close-dialog");
 const closeRemember = document.querySelector("#close-remember");
@@ -395,12 +396,14 @@ settingsLanguage.addEventListener("change", runAction(async () => {
   await saveLanguage(settingsLanguage.value);
 }));
 
-settingsTheme.addEventListener("change", runAction(async () => {
-  settings = await api.updateSettings({ themeMode: settingsTheme.value });
-  syncSettingsControls();
-  applyTheme();
-  setStatus(t("status.themeSaved"));
-}));
+for (const input of settingsThemeInputs) {
+  input.addEventListener("change", runAction(async () => {
+    settings = await api.updateSettings({ themeMode: input.value });
+    syncSettingsControls();
+    applyTheme();
+    setStatus(t("status.themeSaved"));
+  }));
+}
 
 for (const input of document.querySelectorAll('input[name="settings-close-behavior"]')) {
   input.addEventListener("change", runAction(async () => {
@@ -461,7 +464,9 @@ function syncSettingsControls() {
   settingsLowQuotaWarning.checked = Boolean(settings.lowQuotaWarningEnabled);
   settingsRequireSwitchConfirmation.checked = settings.requireSwitchConfirmation !== false;
   settingsLanguage.value = settings.uiLanguage === "en" ? "en" : "zh-CN";
-  settingsTheme.value = normalizeThemeMode(settings.themeMode);
+  for (const input of settingsThemeInputs) {
+    input.checked = input.value === normalizeThemeMode(settings.themeMode);
+  }
   settingsRefreshInterval.value = String(clampRefreshInterval(settings.usageRefreshIntervalMinutes));
   const closeBehavior = settings.closeBehavior === "minimize" || settings.closeBehavior === "quit" ? settings.closeBehavior : "ask";
   const closeInput = document.querySelector(`input[name="settings-close-behavior"][value="${closeBehavior}"]`);
@@ -481,10 +486,12 @@ async function saveLanguage(uiLanguage) {
 function showView(view) {
   currentView = view === "settings" ? "settings" : "accounts";
   const showingSettings = currentView === "settings";
+  accountsView.hidden = showingSettings;
   accountsTopbar.hidden = showingSettings;
   metricsStrip.hidden = showingSettings;
   accountsWorkspace.hidden = showingSettings;
   settingsView.hidden = !showingSettings;
+  accountsView.style.display = showingSettings ? "none" : "";
   accountsTopbar.style.display = showingSettings ? "none" : "";
   metricsStrip.style.display = showingSettings ? "none" : "";
   accountsWorkspace.style.display = showingSettings ? "none" : "";
