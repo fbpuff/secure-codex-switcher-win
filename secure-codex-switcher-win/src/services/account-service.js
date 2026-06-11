@@ -7,6 +7,13 @@ import { protectString, unprotectString } from "../core/dpapi.js";
 import { extractAccessToken, extractAccountId, summarizeAuth } from "../core/auth-summary.js";
 import { fetchUsageSnapshot } from "../core/usage.js";
 import { pickBestAccount as pickBest, remainingScore } from "../core/ranking.js";
+import {
+  HTTP_ONLY_PROVIDER_ID,
+  ensureCodexHttpOnlyMode,
+  readCodexBaseProvider,
+  setCodexHttpOnlyMode
+} from "../core/codex-config.js";
+import { migrateCodexHistoryProvider, revertCodexHistoryProvider } from "../core/codex-history.js";
 
 export function createAccountService(userDataPath, options = {}) {
   return new AccountService(userDataPath, options);
@@ -20,6 +27,7 @@ class AccountService {
     this.closeCodexProcesses = options.closeCodexProcesses ?? closeOfficialCodexProcesses;
     this.launchCodex = options.launchCodex ?? launchOfficialCodex;
     this.codexAuthPath = path.join(this.codexDir, "auth.json");
+    this.codexConfigPath = path.join(this.codexDir, "config.toml");
     this.storePath = path.join(userDataPath, "accounts-store.json");
     this.settingsPath = path.join(userDataPath, "settings.json");
     fs.mkdirSync(userDataPath, { recursive: true });
@@ -150,12 +158,14 @@ class AccountService {
     account.status = "ready";
     account.updatedAt = unixNow();
     this.writeStore(store);
+    const transportWarning = this.ensurePreferredTransport();
     const launchedCodex = this.launchCodex();
     return {
       switchedTo: this.publicAccount(account, fingerprint),
       authPath: this.codexAuthPath,
       closedCodexProcesses,
-      launchedCodex
+      launchedCodex,
+      transportWarning
     };
   }
 
@@ -180,13 +190,15 @@ class AccountService {
       fs.rmSync(this.codexAuthPath, { force: true });
       store.accounts = store.accounts.filter((item) => item.id !== accountId);
       this.writeStore(store);
+      const transportWarning = this.ensurePreferredTransport();
       const launchedCodex = this.launchCodex();
       return {
         deleted: true,
         loginNew: true,
         authPath: this.codexAuthPath,
         closedCodexProcesses,
-        launchedCodex
+        launchedCodex,
+        transportWarning
       };
     }
 
@@ -208,12 +220,14 @@ class AccountService {
       replacementInStore.updatedAt = unixNow();
     }
     this.writeStore(store);
+    const transportWarning = this.ensurePreferredTransport();
     const launchedCodex = this.launchCodex();
     return {
       deleted: true,
       switchedTo: this.publicAccount(replacement, authFingerprint(replacementAuth)),
       closedCodexProcesses,
-      launchedCodex
+      launchedCodex,
+      transportWarning
     };
   }
 
@@ -280,6 +294,7 @@ class AccountService {
       uiLanguage: patch?.uiLanguage === "en" || patch?.uiLanguage === "zh-CN" ? patch.uiLanguage : current.uiLanguage,
       closeBehavior: isCloseBehavior(patch?.closeBehavior) ? patch.closeBehavior : current.closeBehavior,
       themeMode: isThemeMode(patch?.themeMode) ? patch.themeMode : current.themeMode,
+      httpOnlyModeEnabled: current.httpOnlyModeEnabled,
       usageRefreshIntervalMinutes:
         Number.isFinite(patch?.usageRefreshIntervalMinutes)
           ? Math.round(Math.max(1, Math.min(60, Number(patch.usageRefreshIntervalMinutes))))
@@ -287,6 +302,78 @@ class AccountService {
     });
     atomicWriteJson(this.settingsPath, next);
     return next;
+  }
+
+  setHttpOnlyMode(enabled) {
+    const current = this.readSettings();
+    const nextEnabled = Boolean(enabled);
+    if (current.httpOnlyModeEnabled === nextEnabled) {
+      if (nextEnabled) {
+        const baseProvider = readCodexBaseProvider(this.codexConfigPath);
+        const closedCodexProcesses = this.closeCodexProcesses();
+        try {
+          const migration = migrateCodexHistoryProvider(this.codexDir, HTTP_ONLY_PROVIDER_ID, baseProvider);
+          ensureCodexHttpOnlyMode(this.codexConfigPath);
+          const launchedCodex = closedCodexProcesses > 0 ? this.launchCodex() : false;
+          return { settings: current, closedCodexProcesses, launchedCodex, migration };
+        } catch (error) {
+          if (closedCodexProcesses > 0) {
+            this.launchCodex();
+          }
+          throw error;
+        }
+      }
+      return {
+        settings: current,
+        closedCodexProcesses: 0,
+        launchedCodex: false,
+        migration: { changedRollouts: 0, changedThreads: 0 }
+      };
+    }
+
+    const baseProvider = readCodexBaseProvider(this.codexConfigPath);
+    const closedCodexProcesses = this.closeCodexProcesses();
+    try {
+      let migration;
+      if (nextEnabled) {
+        migration = migrateCodexHistoryProvider(this.codexDir, HTTP_ONLY_PROVIDER_ID, baseProvider);
+        try {
+          setCodexHttpOnlyMode(this.codexConfigPath, true);
+        } catch (error) {
+          revertCodexHistoryProvider(this.codexDir, baseProvider);
+          throw error;
+        }
+      } else {
+        migration = revertCodexHistoryProvider(this.codexDir, baseProvider);
+        try {
+          setCodexHttpOnlyMode(this.codexConfigPath, false);
+        } catch (error) {
+          migrateCodexHistoryProvider(this.codexDir, HTTP_ONLY_PROVIDER_ID, baseProvider);
+          throw error;
+        }
+      }
+
+      const settings = normalizeSettings({ ...current, httpOnlyModeEnabled: nextEnabled });
+      atomicWriteJson(this.settingsPath, settings);
+      const launchedCodex = closedCodexProcesses > 0 ? this.launchCodex() : false;
+      return { settings, closedCodexProcesses, launchedCodex, migration };
+    } catch (error) {
+      if (closedCodexProcesses > 0) {
+        this.launchCodex();
+      }
+      throw error;
+    }
+  }
+
+  ensurePreferredTransport() {
+    if (this.readSettings().httpOnlyModeEnabled) {
+      try {
+        ensureCodexHttpOnlyMode(this.codexConfigPath);
+      } catch (error) {
+        return redactError(error);
+      }
+    }
+    return undefined;
   }
 
   readStore() {
@@ -403,6 +490,7 @@ function normalizeSettings(value) {
     uiLanguage: value?.uiLanguage === "en" ? "en" : "zh-CN",
     closeBehavior: isCloseBehavior(value?.closeBehavior) ? value.closeBehavior : "ask",
     themeMode: isThemeMode(value?.themeMode) ? value.themeMode : "system",
+    httpOnlyModeEnabled: typeof value?.httpOnlyModeEnabled === "boolean" ? value.httpOnlyModeEnabled : false,
     usageRefreshIntervalMinutes: Number.isFinite(refreshInterval) ? Math.round(Math.max(1, Math.min(60, refreshInterval))) : 5
   };
 }

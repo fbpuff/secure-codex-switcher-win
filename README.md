@@ -46,7 +46,7 @@ This is still a local tool that handles sensitive auth material. Do not upload y
 ## Requirements
 
 - Windows 10 or Windows 11.
-- Node.js LTS with npm.
+- Node.js 22.12 or newer with npm.
 - Git, or GitHub Desktop, or the ability to download this repository as a ZIP.
 - Official Codex app/CLI installed and able to create `%USERPROFILE%\.codex\auth.json`.
 
@@ -153,6 +153,28 @@ Common failures:
 
 The launcher reads `HTTP_PROXY`, `HTTPS_PROXY`, and Windows user proxy settings.
 
+## HTTP-only Mode
+
+`Settings -> Network -> HTTP-only mode` switches official Codex from WebSocket transport to the Responses HTTP/SSE transport by selecting a dedicated custom provider with `supports_websockets = false`.
+
+Changing this setting:
+
+1. fully closes official Codex;
+2. migrates the `model_provider` tag in active and archived rollout metadata;
+3. updates the matching provider column in `state_*.sqlite`;
+4. writes or removes the Switcher-managed block in `%USERPROFILE%\.codex\config.toml`;
+5. reopens Codex only if it was running before the change.
+
+History migration is necessary because Codex filters its sidebar by `model_provider`. Without migration, old threads are not deleted, but they can appear missing after selecting a custom provider.
+
+Safety measures:
+
+- rollout files are replaced atomically and only their first metadata line is changed;
+- SQLite updates use a transaction;
+- SQLite backups and a reversible provider manifest are stored under `%USERPROFILE%\.codex\secure-switcher-history-backups`;
+- the managed config block is reversible and restores the previous top-level `model_provider`;
+- no auth token, API key, or conversation body is written to the migration manifest.
+
 ## Settings and Window Exit
 
 Open `设置 / Settings` from the left rail to change:
@@ -163,6 +185,7 @@ Open `设置 / Settings` from the left rail to change:
 - Low-quota warning.
 - Auto-switch when the current account is exhausted.
 - Manual switch confirmation.
+- HTTP-only transport for unstable WebSocket proxy environments.
 - Window close behavior.
 - Open the `%USERPROFILE%\.codex` folder.
 - Fully quit the Switcher app.
@@ -187,10 +210,12 @@ Relevant implementation paths:
 - Renderer IPC allowlist for quit: `secure-codex-switcher-win/src/preload.cjs`.
 - Settings UI and event handling: `secure-codex-switcher-win/src/renderer/index.html` and `secure-codex-switcher-win/src/renderer/app.js`.
 - Settings layout and theme styles: `secure-codex-switcher-win/src/renderer/styles.css`.
+- HTTP-only config management: `secure-codex-switcher-win/src/core/codex-config.js`.
+- History provider migration: `secure-codex-switcher-win/src/core/codex-history.js`.
 
 ## Can Others Install Directly From This Repository?
 
-Yes, if they are on Windows and have Node.js/npm installed. The repository contains the source code, launcher, installer script, tests, and dependency lockfile.
+Yes, if they are on Windows and have Node.js 22.12 or newer with npm installed. The repository contains the source code, launcher, installer script, tests, and dependency lockfile.
 
 It is not currently a signed `.exe` installer. Users install it from source with the PowerShell script above. This keeps the distribution transparent: dependencies are installed from `package-lock.json`, and the app can be inspected before running.
 

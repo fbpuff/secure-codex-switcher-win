@@ -204,6 +204,17 @@
             </section>
 
             <section class="settings-section">
+              <h3 data-i18n="settings.networkTitle">网络连接</h3>
+              <label class="settings-row settings-row-first">
+                <span>
+                  <strong data-i18n="settings.httpOnly">HTTP-only 模式</strong>
+                  <small data-i18n="settings.httpOnlyHelp">通过 HTTPS/SSE 连接并迁移历史会话标记，避免代理环境下 WebSocket 反复重连。修改时会关闭 Codex，完成后按原状态重新打开。</small>
+                </span>
+                <input id="settings-http-only" type="checkbox" />
+              </label>
+            </section>
+
+            <section class="settings-section">
               <h3 data-i18n="settings.appTitle">应用</h3>
               <p data-i18n="settings.appHelp">管理本地文件入口和应用退出。</p>
               <div class="settings-button-stack">

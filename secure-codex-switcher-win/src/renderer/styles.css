@@ -689,6 +689,11 @@ button:disabled {
   padding-top: 12px;
 }
 
+.settings-row-first {
+  border-top: 0;
+  padding-top: 0;
+}
+
 .settings-row span,
 .settings-field {
   display: grid;

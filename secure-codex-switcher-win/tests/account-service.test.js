@@ -95,6 +95,39 @@ test("switching to the current account does not restart Codex", { skip: process.
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(codexDir, "auth.json"), "utf8")), auth);
 });
 
+test("account switching still reopens Codex when HTTP-only config repair fails", { skip: process.platform !== "win32" }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  fs.mkdirSync(codexDir, { recursive: true });
+  fs.mkdirSync(userData, { recursive: true });
+  fs.writeFileSync(path.join(codexDir, "auth.json"), JSON.stringify({ access_token: "a", account_id: "acct-a" }), "utf8");
+  fs.writeFileSync(
+    path.join(codexDir, "config.toml"),
+    '[model_providers.secure_codex_switcher_http]\nwire_api = "responses"\n',
+    "utf8"
+  );
+  fs.writeFileSync(path.join(userData, "settings.json"), JSON.stringify({ httpOnlyModeEnabled: true }), "utf8");
+
+  let launchedCodex = 0;
+  const service = createAccountService(userData, {
+    codexDir,
+    closeCodexProcesses: () => 1,
+    launchCodex: () => {
+      launchedCodex += 1;
+      return true;
+    }
+  });
+  const imported = service.importCurrentAuth();
+  fs.writeFileSync(path.join(codexDir, "auth.json"), JSON.stringify({ access_token: "b", account_id: "acct-b" }), "utf8");
+
+  const result = service.switchAccount(imported.id);
+
+  assert.equal(result.launchedCodex, true);
+  assert.equal(launchedCodex, 1);
+  assert.match(result.transportWarning, /already defines model provider/);
+});
+
 test("supports nested Codex tokens auth format", { skip: process.platform !== "win32" }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
   const userData = path.join(root, "appdata");
@@ -175,6 +208,7 @@ test("fills missing legacy settings with safe defaults", { skip: process.platfor
   assert.equal(settings.uiLanguage, "zh-CN");
   assert.equal(settings.closeBehavior, "ask");
   assert.equal(settings.themeMode, "system");
+  assert.equal(settings.httpOnlyModeEnabled, false);
   assert.equal(settings.usageRefreshIntervalMinutes, 5);
 
   const updated = service.updateSettings({ uiLanguage: "en", closeBehavior: "minimize", themeMode: "dark", usageRefreshIntervalMinutes: 0 });
