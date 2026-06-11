@@ -485,8 +485,17 @@ function showView(view) {
   metricsStrip.hidden = showingSettings;
   accountsWorkspace.hidden = showingSettings;
   settingsView.hidden = !showingSettings;
+  accountsTopbar.style.display = showingSettings ? "none" : "";
+  metricsStrip.style.display = showingSettings ? "none" : "";
+  accountsWorkspace.style.display = showingSettings ? "none" : "";
+  settingsView.style.display = showingSettings ? "" : "none";
+  document.body.classList.toggle("view-settings", showingSettings);
+  document.body.classList.toggle("view-accounts", !showingSettings);
   accountsNav.classList.toggle("active", !showingSettings);
   settingsNav.classList.toggle("active", showingSettings);
+  if (showingSettings) {
+    settingsView.scrollTop = 0;
+  }
 }
 
 function applyTheme() {
