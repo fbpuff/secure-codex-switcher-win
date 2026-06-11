@@ -31,6 +31,7 @@ const settingsRequireSwitchConfirmation = document.querySelector("#settings-requ
 const settingsRefreshInterval = document.querySelector("#settings-refresh-interval");
 const settingsThemeInputs = document.querySelectorAll('input[name="settings-theme"]');
 const settingsOpenFolder = document.querySelector("#settings-open-folder");
+const settingsQuitApp = document.querySelector("#settings-quit-app");
 const closeDialog = document.querySelector("#close-dialog");
 const closeRemember = document.querySelector("#close-remember");
 
@@ -87,6 +88,9 @@ const messages = {
     "settings.closeAsk": "每次询问",
     "settings.closeMinimize": "最小化窗口",
     "settings.closeQuit": "关闭应用",
+    "settings.appTitle": "应用",
+    "settings.appHelp": "管理本地文件入口和应用退出。",
+    "settings.quitApp": "退出应用",
     "settings.codexTitle": ".codex 文件夹",
     "settings.codexHelp": "打开官方 Codex auth.json 所在目录。",
     "settings.openCodexFolder": "打开 .codex",
@@ -215,6 +219,9 @@ const messages = {
     "settings.closeAsk": "Ask every time",
     "settings.closeMinimize": "Minimize window",
     "settings.closeQuit": "Quit app",
+    "settings.appTitle": "App",
+    "settings.appHelp": "Manage local file access and app exit.",
+    "settings.quitApp": "Quit App",
     "settings.codexTitle": ".codex Folder",
     "settings.codexHelp": "Open the folder where official Codex stores auth.json.",
     "settings.openCodexFolder": "Open .codex",
@@ -336,12 +343,12 @@ document.querySelector("#pick-best").addEventListener("click", runAction(async (
   setStatus(t("status.bestAccount", { email: result.account.emailMasked, score: Math.round(result.score) }));
 }));
 
-document.querySelector("#open-folder").addEventListener("click", runAction(async () => {
+settingsOpenFolder.addEventListener("click", runAction(async () => {
   await api.openCodexFolder();
 }));
 
-settingsOpenFolder.addEventListener("click", runAction(async () => {
-  await api.openCodexFolder();
+settingsQuitApp.addEventListener("click", runAction(async () => {
+  await api.quitApp();
 }));
 
 accountsNav.addEventListener("click", () => showView("accounts"));

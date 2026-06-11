@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let mainWindow;
 let accountService;
 let isQuitting = false;
+let wasMinimizedByClose = false;
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
@@ -53,17 +54,28 @@ function createMainWindow() {
       return;
     }
 
-    event.preventDefault();
     if (closeBehavior === "minimize") {
+      if (wasMinimizedByClose || mainWindow.isMinimized() || !mainWindow.isVisible()) {
+        isQuitting = true;
+        return;
+      }
+      event.preventDefault();
+      wasMinimizedByClose = true;
       mainWindow.minimize();
       return;
     }
 
+    event.preventDefault();
     mainWindow.webContents.send("app:requestCloseDecision");
   });
 
   mainWindow.on("closed", () => {
     mainWindow = undefined;
+    wasMinimizedByClose = false;
+  });
+
+  mainWindow.on("focus", () => {
+    wasMinimizedByClose = false;
   });
 }
 
@@ -78,6 +90,11 @@ function registerIpc() {
     "accounts:pickBest": () => accountService.pickBestAccount(),
     "settings:read": () => accountService.readSettings(),
     "settings:update": (_event, patch) => accountService.updateSettings(patch),
+    "app:quit": () => {
+      isQuitting = true;
+      app.quit();
+      return { quitting: true };
+    },
     "app:applyCloseDecision": (_event, decision) => {
       const action = decision?.action === "quit" ? "quit" : "minimize";
       const remembered = Boolean(decision?.remember);
@@ -89,6 +106,7 @@ function registerIpc() {
         app.quit();
         return { action, remembered };
       }
+      wasMinimizedByClose = true;
       mainWindow?.minimize();
       return { action, remembered };
     },
@@ -106,6 +124,7 @@ if (gotSingleInstanceLock) {
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
       }
+      wasMinimizedByClose = false;
       mainWindow.show();
       mainWindow.focus();
       return;

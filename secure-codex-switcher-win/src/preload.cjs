@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("codexSwitcher", {
   pickBestAccount: () => invoke("accounts:pickBest"),
   readSettings: () => invoke("settings:read"),
   updateSettings: (patch) => invoke("settings:update", patch),
+  quitApp: () => invoke("app:quit"),
   applyCloseDecision: (decision) => invoke("app:applyCloseDecision", decision),
   onCloseDecisionRequested: (callback) => {
     const handler = () => callback();
