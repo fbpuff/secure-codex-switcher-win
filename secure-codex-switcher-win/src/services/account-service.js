@@ -276,7 +276,8 @@ class AccountService {
       lowQuotaThresholdPercent:
         Number.isFinite(patch?.lowQuotaThresholdPercent)
           ? Math.max(1, Math.min(50, Number(patch.lowQuotaThresholdPercent)))
-          : current.lowQuotaThresholdPercent
+          : current.lowQuotaThresholdPercent,
+      uiLanguage: patch?.uiLanguage === "en" || patch?.uiLanguage === "zh-CN" ? patch.uiLanguage : current.uiLanguage
     });
     atomicWriteJson(this.settingsPath, next);
     return next;
@@ -391,7 +392,8 @@ function normalizeSettings(value) {
     autoSwitchEnabled: typeof value?.autoSwitchEnabled === "boolean" ? value.autoSwitchEnabled : false,
     requireSwitchConfirmation: typeof value?.requireSwitchConfirmation === "boolean" ? value.requireSwitchConfirmation : true,
     lowQuotaWarningEnabled: typeof value?.lowQuotaWarningEnabled === "boolean" ? value.lowQuotaWarningEnabled : true,
-    lowQuotaThresholdPercent: Number.isFinite(threshold) ? Math.max(1, Math.min(50, threshold)) : 15
+    lowQuotaThresholdPercent: Number.isFinite(threshold) ? Math.max(1, Math.min(50, threshold)) : 15,
+    uiLanguage: value?.uiLanguage === "en" ? "en" : "zh-CN"
   };
 }
 

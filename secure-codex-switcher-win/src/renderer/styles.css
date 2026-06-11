@@ -355,6 +355,26 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.language-select {
+  display: grid;
+  gap: 4px;
+  min-width: 108px;
+}
+
+.language-select span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.language-select select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 10px;
+}
+
 .metrics-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) repeat(2, 190px);
