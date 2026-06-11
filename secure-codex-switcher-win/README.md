@@ -86,6 +86,12 @@ HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings
 
 For example, a local proxy such as `127.0.0.1:7897` will be normalized to `http://127.0.0.1:7897`.
 
+## HTTP-only mode
+
+Enable `设置 / Settings -> 网络连接 / Network -> HTTP-only mode` when a proxy makes WebSocket connections repeatedly reconnect. The Switcher fully closes official Codex, selects a custom provider with `supports_websockets = false`, migrates rollout and SQLite history provider tags so existing threads remain visible, and reopens Codex if it was running.
+
+The config change is reversible. SQLite safety backups and the provider migration manifest stay under `%USERPROFILE%\.codex\secure-switcher-history-backups`. The manifest contains provider metadata only, not auth tokens, API keys, or conversation bodies.
+
 ## Settings
 
 Open `设置 / Settings` from the left rail to change:
@@ -96,6 +102,7 @@ Open `设置 / Settings` from the left rail to change:
 - Low-quota warning.
 - Auto-switch when the current account is exhausted.
 - Manual switch confirmation.
+- HTTP-only transport for unstable WebSocket proxy environments.
 - Window close behavior: ask every time, minimize to the taskbar, or quit the app.
 - Open the `%USERPROFILE%\.codex` folder.
 - Fully quit the Switcher app.

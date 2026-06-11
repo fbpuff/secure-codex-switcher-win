@@ -47,7 +47,7 @@
 ## 安装要求
 
 - Windows 10 或 Windows 11。
-- Node.js LTS 和 npm。
+- Node.js 22.12 或更高版本，以及 npm。
 - Git，或 GitHub Desktop，或能下载仓库 ZIP。
 - 已安装官方 Codex 应用/CLI，并能生成 `%USERPROFILE%\.codex\auth.json`。
 
@@ -152,6 +152,28 @@ GUI 会导入官方 Codex 的 auth 文件：
 
 启动脚本会读取 `HTTP_PROXY`、`HTTPS_PROXY` 和 Windows 当前用户代理设置。
 
+## HTTP-only 模式
+
+在 `设置 -> 网络连接 -> HTTP-only 模式` 中，可以让官方 Codex 使用 Responses HTTP/SSE 传输，并通过独立的自定义 provider 设置 `supports_websockets = false`，减少代理环境下 WebSocket 反复 reconnect 的情况。
+
+修改此设置时，Switcher 会：
+
+1. 完全关闭官方 Codex；
+2. 迁移活动和归档 rollout 元数据中的 `model_provider`；
+3. 更新 `state_*.sqlite` 中对应的 provider 字段；
+4. 写入或移除 `%USERPROFILE%\.codex\config.toml` 中由 Switcher 管理的配置段；
+5. 仅在修改前 Codex 正在运行时自动重新打开。
+
+迁移历史标记是必要步骤，因为 Codex 会按 `model_provider` 过滤侧栏。只修改配置不会删除旧对话，但旧对话可能会像“消失”一样被隐藏。
+
+安全措施：
+
+- rollout 文件采用原子替换，只修改第一行会话元数据；
+- SQLite 修改在事务中完成；
+- SQLite 备份和可恢复迁移清单保存在 `%USERPROFILE%\.codex\secure-switcher-history-backups`；
+- Switcher 管理的配置段可以撤销，并恢复原来的顶层 `model_provider`；
+- 迁移清单不保存 auth token、API key 或对话正文。
+
 ## 设置与退出
 
 从左侧栏打开 `设置 / Settings` 可以修改：
@@ -162,6 +184,7 @@ GUI 会导入官方 Codex 的 auth 文件：
 - 低余量提醒。
 - 当前账号用尽后的自动切换。
 - 手动切换前确认。
+- 适用于 WebSocket 代理不稳定环境的 HTTP-only 传输。
 - 窗口关闭行为。
 - 打开 `%USERPROFILE%\.codex` 文件夹。
 - 彻底退出 Switcher 应用。
@@ -186,10 +209,12 @@ GUI 会导入官方 Codex 的 auth 文件：
 - Renderer 退出 IPC allowlist：`secure-codex-switcher-win/src/preload.cjs`。
 - 设置页结构和事件：`secure-codex-switcher-win/src/renderer/index.html`、`secure-codex-switcher-win/src/renderer/app.js`。
 - 设置页布局和主题样式：`secure-codex-switcher-win/src/renderer/styles.css`。
+- HTTP-only 配置管理：`secure-codex-switcher-win/src/core/codex-config.js`。
+- 历史 provider 迁移：`secure-codex-switcher-win/src/core/codex-history.js`。
 
 ## 别人能否直接安装
 
-可以，只要对方是 Windows 且安装了 Node.js/npm。仓库里包含源码、启动脚本、安装脚本、测试和依赖锁文件。
+可以，只要对方是 Windows 且安装了 Node.js 22.12 或更高版本及 npm。仓库里包含源码、启动脚本、安装脚本、测试和依赖锁文件。
 
 目前它不是签名 `.exe` 安装包，而是源码安装。这样更透明：依赖来自 `package-lock.json`，用户可以先审查代码再运行。
 

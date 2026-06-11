@@ -90,6 +90,7 @@ function registerIpc() {
     "accounts:pickBest": () => accountService.pickBestAccount(),
     "settings:read": () => accountService.readSettings(),
     "settings:update": (_event, patch) => accountService.updateSettings(patch),
+    "settings:setHttpOnly": (_event, enabled) => accountService.setHttpOnlyMode(enabled),
     "app:quit": () => {
       isQuitting = true;
       app.quit();

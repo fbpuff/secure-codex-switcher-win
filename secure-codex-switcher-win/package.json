@@ -5,6 +5,9 @@
   "description": "A local-only Windows Codex account switcher with encrypted account storage and usage-aware switching.",
   "type": "module",
   "main": "src/main.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "start": "electron .",
     "cli": "node src/cli.js",

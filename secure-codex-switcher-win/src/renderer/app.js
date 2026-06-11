@@ -29,6 +29,7 @@ const settingsAutoSwitch = document.querySelector("#settings-auto-switch");
 const settingsLowQuotaWarning = document.querySelector("#settings-low-quota-warning");
 const settingsRequireSwitchConfirmation = document.querySelector("#settings-require-switch-confirmation");
 const settingsRefreshInterval = document.querySelector("#settings-refresh-interval");
+const settingsHttpOnly = document.querySelector("#settings-http-only");
 const settingsThemeInputs = document.querySelectorAll('input[name="settings-theme"]');
 const settingsOpenFolder = document.querySelector("#settings-open-folder");
 const settingsQuitApp = document.querySelector("#settings-quit-app");
@@ -78,6 +79,9 @@ const messages = {
     "settings.refreshInterval": "自动刷新间隔",
     "settings.minutes": "分钟",
     "settings.refreshHelp": "修改后立即生效，手动刷新不受影响。",
+    "settings.networkTitle": "网络连接",
+    "settings.httpOnly": "HTTP-only 模式",
+    "settings.httpOnlyHelp": "通过 HTTPS/SSE 连接并迁移历史会话标记，避免代理环境下 WebSocket 反复重连。修改时会关闭 Codex，完成后按原状态重新打开。",
     "settings.interfaceTitle": "界面",
     "settings.language": "语言",
     "settings.theme": "颜色主题",
@@ -113,6 +117,8 @@ const messages = {
     "status.switchConfirmOn": "已开启切换确认",
     "status.switchConfirmOff": "已关闭切换确认",
     "status.refreshIntervalSaved": "余量自动刷新间隔已更新",
+    "status.httpOnlyOn": "已启用 HTTP-only，并迁移 {rollouts} 个会话、{threads} 条索引。{launch}",
+    "status.httpOnlyOff": "已恢复默认网络传输，并还原 {rollouts} 个会话、{threads} 条索引。{launch}",
     "status.closeBehaviorSaved": "关闭窗口行为已保存",
     "status.themeSaved": "颜色主题已保存",
     "status.settingsSaved": "设置已保存",
@@ -129,6 +135,7 @@ const messages = {
     "status.switchResult": "{prefix}，并关闭 {count} 个 Codex 进程。{launch}",
     "status.launchOk": "已自动打开官方 Codex。",
     "status.launchFailed": "未能自动打开官方 Codex，请手动打开。",
+    "status.transportWarning": "HTTP-only 配置校验失败：{error}",
     "status.loginNew": "当前账号已删除，并关闭 {count} 个 Codex 进程。{launch}请在官方 Codex 完成新账号登录，然后回到这里点击“导入/新增当前”。",
     "status.refreshFailures": "{message}，{count} 个账号刷新失败",
     "quota.empty": "当前账号余量已用尽，建议切换账号；如果已开启自动切换，应用会选择可用账号并关闭官方 Codex。",
@@ -163,6 +170,7 @@ const messages = {
     "statusLabel.needs_login": "登录态待刷新",
     "confirm.switch": "切换到 {email}？\n\n切换时会自动关闭正在运行的官方 Codex，并尝试自动重新打开。",
     "confirm.delete": "删除 {email} 的本地加密记录？\n\n该账号不是当前账号，不会关闭官方 Codex。",
+    "confirm.httpOnly": "修改网络传输模式会完全关闭官方 Codex，并迁移历史会话标记。完成后会按原状态重新打开。\n\n继续吗？",
     "modal.deleteSwitch": "删除并切换",
     "modal.deleteLogin": "删除并登录新账号",
     "modal.continue": "继续"
@@ -209,6 +217,9 @@ const messages = {
     "settings.refreshInterval": "Auto-refresh interval",
     "settings.minutes": "minutes",
     "settings.refreshHelp": "Changes apply immediately. Manual refresh is unaffected.",
+    "settings.networkTitle": "Network",
+    "settings.httpOnly": "HTTP-only mode",
+    "settings.httpOnlyHelp": "Use HTTPS/SSE and migrate history provider tags to avoid repeated WebSocket reconnects behind proxies. Codex closes during the change and reopens if it was running.",
     "settings.interfaceTitle": "Interface",
     "settings.language": "Language",
     "settings.theme": "Color theme",
@@ -244,6 +255,8 @@ const messages = {
     "status.switchConfirmOn": "Switch confirmation enabled",
     "status.switchConfirmOff": "Switch confirmation disabled",
     "status.refreshIntervalSaved": "Usage auto-refresh interval updated",
+    "status.httpOnlyOn": "HTTP-only enabled; migrated {rollouts} sessions and {threads} index rows. {launch}",
+    "status.httpOnlyOff": "Default transport restored; reverted {rollouts} sessions and {threads} index rows. {launch}",
     "status.closeBehaviorSaved": "Window close behavior saved",
     "status.themeSaved": "Color theme saved",
     "status.settingsSaved": "Settings saved",
@@ -260,6 +273,7 @@ const messages = {
     "status.switchResult": "{prefix}, and closed {count} Codex processes. {launch}",
     "status.launchOk": "Official Codex was reopened.",
     "status.launchFailed": "Could not reopen official Codex; please open it manually.",
+    "status.transportWarning": "HTTP-only configuration check failed: {error}",
     "status.loginNew": "Current account deleted and {count} Codex processes were closed. {launch}Finish login in official Codex, then return here and click Import/Add Current.",
     "status.refreshFailures": "{message}, {count} accounts failed",
     "quota.empty": "The current account is exhausted. Switch accounts; if auto-switch is enabled, the app will choose a usable account and close official Codex.",
@@ -294,6 +308,7 @@ const messages = {
     "statusLabel.needs_login": "Login state needs refresh",
     "confirm.switch": "Switch to {email}?\n\nSwitching will close official Codex and try to reopen it.",
     "confirm.delete": "Delete the local encrypted record for {email}?\n\nThis account is not current, so official Codex will not be closed.",
+    "confirm.httpOnly": "Changing the transport fully closes official Codex and migrates history provider tags. It reopens afterward if it was running.\n\nContinue?",
     "modal.deleteSwitch": "Delete and Switch",
     "modal.deleteLogin": "Delete and Log In",
     "modal.continue": "Continue"
@@ -310,6 +325,7 @@ let settings = {
   uiLanguage: "zh-CN",
   closeBehavior: "ask",
   themeMode: "system",
+  httpOnlyModeEnabled: false,
   usageRefreshIntervalMinutes: 5
 };
 let autoSwitchInProgress = false;
@@ -399,6 +415,31 @@ settingsRefreshInterval.addEventListener("change", runAction(async () => {
   setStatus(t("status.refreshIntervalSaved"));
 }));
 
+settingsHttpOnly.addEventListener("change", runAction(async () => {
+  const requested = settingsHttpOnly.checked;
+  if (!confirm(t("confirm.httpOnly"))) {
+    settingsHttpOnly.checked = !requested;
+    return;
+  }
+  try {
+    const result = await api.setHttpOnlyMode(requested);
+    settings = result.settings;
+    syncSettingsControls();
+    const launch = result.closedCodexProcesses > 0
+      ? (result.launchedCodex ? t("status.launchOk") : t("status.launchFailed"))
+      : "";
+    setStatus(t(requested ? "status.httpOnlyOn" : "status.httpOnlyOff", {
+      rollouts: result.migration?.changedRollouts ?? 0,
+      threads: result.migration?.changedThreads ?? 0,
+      launch
+    }));
+  } catch (error) {
+    settings = await api.readSettings();
+    syncSettingsControls();
+    throw error;
+  }
+}));
+
 settingsLanguage.addEventListener("change", runAction(async () => {
   await saveLanguage(settingsLanguage.value);
 }));
@@ -470,6 +511,7 @@ function syncSettingsControls() {
   settingsAutoSwitch.checked = Boolean(settings.autoSwitchEnabled);
   settingsLowQuotaWarning.checked = Boolean(settings.lowQuotaWarningEnabled);
   settingsRequireSwitchConfirmation.checked = settings.requireSwitchConfirmation !== false;
+  settingsHttpOnly.checked = Boolean(settings.httpOnlyModeEnabled);
   settingsLanguage.value = settings.uiLanguage === "en" ? "en" : "zh-CN";
   for (const input of settingsThemeInputs) {
     input.checked = input.value === normalizeThemeMode(settings.themeMode);
@@ -855,13 +897,15 @@ function switchMessage(prefix, result) {
   }
   const closed = result.closedCodexProcesses ?? 0;
   const launch = result.launchedCodex ? t("status.launchOk") : t("status.launchFailed");
-  return t("status.switchResult", { prefix, count: closed, launch });
+  const warning = result.transportWarning ? ` ${t("status.transportWarning", { error: result.transportWarning })}` : "";
+  return `${t("status.switchResult", { prefix, count: closed, launch })}${warning}`;
 }
 
 function loginNewMessage(result) {
   const closed = result.closedCodexProcesses ?? 0;
   const launch = result.launchedCodex ? t("status.launchOk") : t("status.launchFailed");
-  return t("status.loginNew", { count: closed, launch });
+  const warning = result.transportWarning ? ` ${t("status.transportWarning", { error: result.transportWarning })}` : "";
+  return `${t("status.loginNew", { count: closed, launch })}${warning}`;
 }
 
 function usageRing(label, window) {
