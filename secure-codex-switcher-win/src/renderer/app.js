@@ -113,7 +113,7 @@ const messages = {
     "nav.accounts": "Accounts",
     "rail.dpapi": "DPAPI protected",
     "top.eyebrow": "Local account vault",
-    "top.title": "Account Usage and Switching",
+    "top.title": "Usage & Switching",
     "top.language": "Language",
     "actions.importCurrent": "Import/Add Current",
     "actions.refreshAll": "Refresh All",
@@ -125,10 +125,10 @@ const messages = {
     "metrics.total": "Accounts",
     "metrics.current": "Current",
     "metrics.best": "Best Score",
-    "toggles.autoSwitch": "Auto-switch when exhausted",
+    "toggles.autoSwitch": "Auto-switch on empty",
     "toggles.lowWarning": "Low-quota warning",
     "search.placeholder": "Search account, plan, status",
-    "modal.deleteCurrentTitle": "Delete Current Account",
+    "modal.deleteCurrentTitle": "Delete Current",
     "modal.deleteCurrentIntro": "Choose which login state official Codex should use next.",
     "modal.switchExisting": "Switch to saved account",
     "modal.switchExistingHelp": "Close official Codex, write a saved account, then reopen it.",
@@ -390,6 +390,7 @@ function renderAccounts() {
 
   for (const account of filtered) {
     const node = template.content.firstElementChild.cloneNode(true);
+    translateTree(node);
     node.classList.toggle("current", account.isCurrent);
     node.classList.toggle("selected", account.id === selectedAccountId);
     node.querySelector('[data-field="avatar"]').textContent = initials(account);
@@ -735,13 +736,17 @@ function formatTime(unixSeconds) {
 
 function applyTranslations() {
   document.documentElement.lang = currentLanguage();
-  for (const node of document.querySelectorAll("[data-i18n]")) {
+  translateTree(document);
+  replacementConfirm.textContent = t("modal.continue");
+}
+
+function translateTree(root) {
+  for (const node of root.querySelectorAll("[data-i18n]")) {
     node.textContent = t(node.dataset.i18n);
   }
-  for (const node of document.querySelectorAll("[data-i18n-placeholder]")) {
+  for (const node of root.querySelectorAll("[data-i18n-placeholder]")) {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   }
-  replacementConfirm.textContent = t("modal.continue");
 }
 
 function currentLanguage() {

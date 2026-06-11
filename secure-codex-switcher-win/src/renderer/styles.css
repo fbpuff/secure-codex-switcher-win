@@ -51,6 +51,7 @@ button {
   color: var(--ink);
   padding: 0 12px;
   cursor: pointer;
+  line-height: 1.25;
 }
 
 button:hover:not(:disabled) {
@@ -306,9 +307,15 @@ button:disabled {
 
 .topbar {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   padding: 24px 30px 18px;
+}
+
+.topbar > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
 }
 
 .eyebrow {
@@ -353,12 +360,14 @@ button:disabled {
   gap: 9px;
   align-content: start;
   justify-content: flex-end;
+  max-width: 560px;
 }
 
 .language-select {
   display: grid;
   gap: 4px;
-  min-width: 108px;
+  min-width: 120px;
+  max-width: 150px;
 }
 
 .language-select span {
@@ -377,7 +386,7 @@ button:disabled {
 
 .metrics-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) repeat(2, 190px);
+  grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
   gap: 12px;
   padding: 0 30px 18px;
 }
@@ -418,11 +427,17 @@ button:disabled {
   gap: 10px;
   align-items: center;
   cursor: pointer;
+  line-height: 1.25;
 }
 
 .toggle-card input {
   position: absolute;
   opacity: 0;
+}
+
+.toggle-card span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .toggle-visual {
@@ -736,6 +751,7 @@ button:disabled {
   padding: 0 9px;
   color: var(--accent-strong);
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .account-action-button.danger {
@@ -844,6 +860,7 @@ button:disabled {
 }
 
 .detail-usage-card > div:last-child span {
+  overflow-wrap: anywhere;
   color: var(--ink);
   font-size: 13px;
   font-weight: 620;
@@ -890,6 +907,7 @@ button:disabled {
 }
 
 .reset-row strong {
+  min-width: 0;
   color: var(--ink);
   font-size: 12px;
   font-weight: 500;
@@ -899,6 +917,11 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.detail-actions button {
+  min-width: 0;
+  white-space: normal;
 }
 
 .empty-state,
@@ -1083,7 +1106,27 @@ button:disabled {
     flex-direction: column;
   }
 
+  .topbar-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
   .list-panel {
     border-right: 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .topbar-actions {
+    max-width: 460px;
+  }
+
+  .topbar-actions button {
+    flex: 1 1 138px;
+  }
+
+  .language-select {
+    flex: 1 1 138px;
+    max-width: none;
   }
 }
