@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow;
 let accountService;
+let isQuitting = false;
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
@@ -41,6 +42,26 @@ function createMainWindow() {
     }
   });
 
+  mainWindow.on("close", (event) => {
+    if (isQuitting) {
+      return;
+    }
+
+    const closeBehavior = accountService.readSettings().closeBehavior;
+    if (closeBehavior === "quit") {
+      isQuitting = true;
+      return;
+    }
+
+    event.preventDefault();
+    if (closeBehavior === "minimize") {
+      mainWindow.minimize();
+      return;
+    }
+
+    mainWindow.webContents.send("app:requestCloseDecision");
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = undefined;
   });
@@ -57,6 +78,20 @@ function registerIpc() {
     "accounts:pickBest": () => accountService.pickBestAccount(),
     "settings:read": () => accountService.readSettings(),
     "settings:update": (_event, patch) => accountService.updateSettings(patch),
+    "app:applyCloseDecision": (_event, decision) => {
+      const action = decision?.action === "quit" ? "quit" : "minimize";
+      const remembered = Boolean(decision?.remember);
+      if (remembered) {
+        accountService.updateSettings({ closeBehavior: action });
+      }
+      if (action === "quit") {
+        isQuitting = true;
+        app.quit();
+        return { action, remembered };
+      }
+      mainWindow?.minimize();
+      return { action, remembered };
+    },
     "system:openCodexFolder": () => shell.openPath(accountService.codexDir)
   };
 

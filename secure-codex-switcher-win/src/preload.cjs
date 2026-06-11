@@ -12,5 +12,11 @@ contextBridge.exposeInMainWorld("codexSwitcher", {
   pickBestAccount: () => invoke("accounts:pickBest"),
   readSettings: () => invoke("settings:read"),
   updateSettings: (patch) => invoke("settings:update", patch),
+  applyCloseDecision: (decision) => invoke("app:applyCloseDecision", decision),
+  onCloseDecisionRequested: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("app:requestCloseDecision", handler);
+    return () => ipcRenderer.removeListener("app:requestCloseDecision", handler);
+  },
   openCodexFolder: () => invoke("system:openCodexFolder")
 });
