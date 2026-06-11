@@ -28,6 +28,7 @@ const settingsAutoSwitch = document.querySelector("#settings-auto-switch");
 const settingsLowQuotaWarning = document.querySelector("#settings-low-quota-warning");
 const settingsRequireSwitchConfirmation = document.querySelector("#settings-require-switch-confirmation");
 const settingsRefreshInterval = document.querySelector("#settings-refresh-interval");
+const settingsTheme = document.querySelector("#settings-theme");
 const settingsOpenFolder = document.querySelector("#settings-open-folder");
 const closeDialog = document.querySelector("#close-dialog");
 const closeRemember = document.querySelector("#close-remember");
@@ -77,6 +78,10 @@ const messages = {
     "settings.refreshHelp": "修改后立即生效，手动刷新不受影响。",
     "settings.interfaceTitle": "界面",
     "settings.language": "语言",
+    "settings.theme": "颜色主题",
+    "settings.themeSystem": "跟随系统设置",
+    "settings.themeLight": "亮色",
+    "settings.themeDark": "暗色",
     "settings.closeBehavior": "关闭窗口行为",
     "settings.closeAsk": "每次询问",
     "settings.closeMinimize": "最小化窗口",
@@ -104,6 +109,7 @@ const messages = {
     "status.switchConfirmOff": "已关闭切换确认",
     "status.refreshIntervalSaved": "余量自动刷新间隔已更新",
     "status.closeBehaviorSaved": "关闭窗口行为已保存",
+    "status.themeSaved": "颜色主题已保存",
     "status.settingsSaved": "设置已保存",
     "status.languageSaved": "语言已切换为中文",
     "status.backgroundUpdated": "后台余量已更新",
@@ -200,6 +206,10 @@ const messages = {
     "settings.refreshHelp": "Changes apply immediately. Manual refresh is unaffected.",
     "settings.interfaceTitle": "Interface",
     "settings.language": "Language",
+    "settings.theme": "Color theme",
+    "settings.themeSystem": "Follow system",
+    "settings.themeLight": "Light",
+    "settings.themeDark": "Dark",
     "settings.closeBehavior": "Window close behavior",
     "settings.closeAsk": "Ask every time",
     "settings.closeMinimize": "Minimize window",
@@ -227,6 +237,7 @@ const messages = {
     "status.switchConfirmOff": "Switch confirmation disabled",
     "status.refreshIntervalSaved": "Usage auto-refresh interval updated",
     "status.closeBehaviorSaved": "Window close behavior saved",
+    "status.themeSaved": "Color theme saved",
     "status.settingsSaved": "Settings saved",
     "status.languageSaved": "Language switched to English",
     "status.backgroundUpdated": "Background usage updated",
@@ -290,6 +301,7 @@ let settings = {
   lowQuotaThresholdPercent: 15,
   uiLanguage: "zh-CN",
   closeBehavior: "ask",
+  themeMode: "system",
   usageRefreshIntervalMinutes: 5
 };
 let autoSwitchInProgress = false;
@@ -383,6 +395,13 @@ settingsLanguage.addEventListener("change", runAction(async () => {
   await saveLanguage(settingsLanguage.value);
 }));
 
+settingsTheme.addEventListener("change", runAction(async () => {
+  settings = await api.updateSettings({ themeMode: settingsTheme.value });
+  syncSettingsControls();
+  applyTheme();
+  setStatus(t("status.themeSaved"));
+}));
+
 for (const input of document.querySelectorAll('input[name="settings-close-behavior"]')) {
   input.addEventListener("change", runAction(async () => {
     settings = await api.updateSettings({ closeBehavior: input.value });
@@ -422,6 +441,7 @@ initialize();
 
 async function initialize() {
   await loadSettings();
+  applyTheme();
   applyTranslations();
   showView(currentView);
   await loadAccounts(t("status.ready"));
@@ -441,6 +461,7 @@ function syncSettingsControls() {
   settingsLowQuotaWarning.checked = Boolean(settings.lowQuotaWarningEnabled);
   settingsRequireSwitchConfirmation.checked = settings.requireSwitchConfirmation !== false;
   settingsLanguage.value = settings.uiLanguage === "en" ? "en" : "zh-CN";
+  settingsTheme.value = normalizeThemeMode(settings.themeMode);
   settingsRefreshInterval.value = String(clampRefreshInterval(settings.usageRefreshIntervalMinutes));
   const closeBehavior = settings.closeBehavior === "minimize" || settings.closeBehavior === "quit" ? settings.closeBehavior : "ask";
   const closeInput = document.querySelector(`input[name="settings-close-behavior"][value="${closeBehavior}"]`);
@@ -466,6 +487,14 @@ function showView(view) {
   settingsView.hidden = !showingSettings;
   accountsNav.classList.toggle("active", !showingSettings);
   settingsNav.classList.toggle("active", showingSettings);
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = normalizeThemeMode(settings.themeMode);
+}
+
+function normalizeThemeMode(value) {
+  return value === "light" || value === "dark" ? value : "system";
 }
 
 function startBackgroundRefreshTimer() {
