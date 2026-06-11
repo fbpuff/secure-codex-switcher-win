@@ -17,14 +17,14 @@
           <span class="brand-mark" aria-hidden="true">CS</span>
           <div>
             <h1>Codex Switcher</h1>
-            <p>Windows Local</p>
+            <p data-i18n="brand.subtitle">Windows Local</p>
           </div>
         </div>
 
         <nav class="nav-stack" aria-label="Primary">
           <button class="nav-item active" type="button">
             <span class="nav-icon accounts-icon" aria-hidden="true"></span>
-            <span>账号</span>
+            <span data-i18n="nav.accounts">账号</span>
           </button>
           <button id="open-folder" class="nav-item" type="button">
             <span class="nav-icon folder-icon" aria-hidden="true"></span>
@@ -34,56 +34,63 @@
 
         <div class="rail-footer">
           <span class="privacy-dot" aria-hidden="true"></span>
-          <span>DPAPI protected</span>
+          <span data-i18n="rail.dpapi">DPAPI protected</span>
         </div>
       </aside>
 
       <main class="workspace">
         <header class="topbar">
           <div>
-            <span class="eyebrow">本机账号保险箱</span>
-            <h2>账号余量与切换</h2>
+            <span class="eyebrow" data-i18n="top.eyebrow">本机账号保险箱</span>
+            <h2 data-i18n="top.title">账号余量与切换</h2>
             <p id="status-line">准备就绪</p>
             <p id="quota-warning-line" class="quota-warning-line" hidden></p>
           </div>
           <div class="topbar-actions">
+            <label class="language-select">
+              <span data-i18n="top.language">语言</span>
+              <select id="language-select">
+                <option value="zh-CN">中文</option>
+                <option value="en">English</option>
+              </select>
+            </label>
             <button id="import-current" class="primary-action" type="button">
               <span class="button-icon import-icon" aria-hidden="true"></span>
-              <span>导入/新增当前</span>
+              <span data-i18n="actions.importCurrent">导入/新增当前</span>
             </button>
             <button id="refresh-all" type="button">
               <span class="button-icon refresh-icon" aria-hidden="true"></span>
-              <span>刷新全部</span>
+              <span data-i18n="actions.refreshAll">刷新全部</span>
             </button>
             <button id="pick-best" type="button">
               <span class="button-icon target-icon" aria-hidden="true"></span>
-              <span>最佳账号</span>
+              <span data-i18n="actions.bestAccount">最佳账号</span>
             </button>
           </div>
         </header>
 
         <section class="metrics-strip" aria-label="Summary">
           <article class="metric">
-            <span>账号数</span>
+            <span data-i18n="metrics.total">账号数</span>
             <strong id="metric-total">0</strong>
           </article>
           <article class="metric">
-            <span>当前账号</span>
+            <span data-i18n="metrics.current">当前账号</span>
             <strong id="metric-current">无</strong>
           </article>
           <article class="metric">
-            <span>最佳账号分数</span>
+            <span data-i18n="metrics.best">最佳账号分数</span>
             <strong id="metric-best">未知</strong>
           </article>
           <label class="toggle-card">
             <input id="auto-switch" type="checkbox" />
             <span class="toggle-visual" aria-hidden="true"></span>
-            <span>用尽后自动切换</span>
+            <span data-i18n="toggles.autoSwitch">用尽后自动切换</span>
           </label>
           <label class="toggle-card">
             <input id="low-quota-warning" type="checkbox" />
             <span class="toggle-visual" aria-hidden="true"></span>
-            <span>低余量提醒</span>
+            <span data-i18n="toggles.lowWarning">低余量提醒</span>
           </label>
         </section>
 
@@ -92,7 +99,7 @@
             <div class="list-tools">
               <label class="search-field">
                 <span class="search-icon" aria-hidden="true"></span>
-                <input id="account-search" type="search" placeholder="搜索账号、计划、状态" />
+                <input id="account-search" type="search" placeholder="搜索账号、计划、状态" data-i18n-placeholder="search.placeholder" />
               </label>
               <span id="result-count" class="result-count">0 个账号</span>
             </div>
@@ -122,15 +129,15 @@
         <div class="account-actions">
           <button data-action="switch" class="account-action-button" type="button" title="切换账号">
             <span class="button-icon switch-icon" aria-hidden="true"></span>
-            <span>切换</span>
+            <span data-i18n="actions.switch">切换</span>
           </button>
           <button data-action="refresh" class="account-action-button" type="button" title="刷新余量">
             <span class="button-icon refresh-icon" aria-hidden="true"></span>
-            <span>刷新</span>
+            <span data-i18n="actions.refresh">刷新</span>
           </button>
           <button data-action="delete" class="account-action-button danger" type="button" title="删除本地记录">
             <span class="button-icon trash-icon" aria-hidden="true"></span>
-            <span>删除</span>
+            <span data-i18n="actions.delete">删除</span>
           </button>
         </div>
       </article>
@@ -138,30 +145,30 @@
 
     <dialog id="replacement-dialog" class="modal-dialog">
       <form method="dialog" class="modal-panel">
-        <h3>删除当前账号</h3>
-        <p>删除当前账号前，先选择接下来要让官方 Codex 使用哪个登录态。</p>
+        <h3 data-i18n="modal.deleteCurrentTitle">删除当前账号</h3>
+        <p data-i18n="modal.deleteCurrentIntro">删除当前账号前，先选择接下来要让官方 Codex 使用哪个登录态。</p>
         <fieldset class="modal-choice-group">
           <label class="modal-choice">
             <input name="delete-current-mode" value="switch" type="radio" checked />
             <span>
-              <strong>切换已有账号</strong>
-              <small>关闭官方 Codex，写入已保存账号，然后自动重新打开。</small>
+              <strong data-i18n="modal.switchExisting">切换已有账号</strong>
+              <small data-i18n="modal.switchExistingHelp">关闭官方 Codex，写入已保存账号，然后自动重新打开。</small>
             </span>
           </label>
           <label class="modal-choice">
             <input name="delete-current-mode" value="login_new" type="radio" />
             <span>
-              <strong>登录新账号</strong>
-              <small>关闭官方 Codex，移除当前 auth.json，然后打开官方 Codex 登录。</small>
+              <strong data-i18n="modal.loginNew">登录新账号</strong>
+              <small data-i18n="modal.loginNewHelp">关闭官方 Codex，移除当前 auth.json，然后打开官方 Codex 登录。</small>
             </span>
           </label>
         </fieldset>
         <label id="replacement-field" class="modal-field">
-          <span>替代账号</span>
+          <span data-i18n="modal.replacement">替代账号</span>
           <select id="replacement-select"></select>
         </label>
         <div class="modal-actions">
-          <button value="cancel" type="submit">取消</button>
+          <button value="cancel" type="submit" data-i18n="actions.cancel">取消</button>
           <button id="replacement-confirm" class="primary-action" value="confirm" type="submit">继续</button>
         </div>
       </form>

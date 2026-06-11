@@ -172,6 +172,11 @@ test("fills missing legacy settings with safe defaults", { skip: process.platfor
   const settings = service.readSettings();
   assert.equal(settings.lowQuotaThresholdPercent, 15);
   assert.equal(settings.autoSwitchEnabled, true);
+  assert.equal(settings.uiLanguage, "zh-CN");
+
+  const updated = service.updateSettings({ uiLanguage: "en" });
+  assert.equal(updated.uiLanguage, "en");
+  assert.equal(service.readSettings().uiLanguage, "en");
 });
 
 test("migrates plaintext auth backups to DPAPI encrypted files", { skip: process.platform !== "win32" }, () => {

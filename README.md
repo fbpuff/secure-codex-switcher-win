@@ -2,6 +2,8 @@
 
 A local-only Windows GUI for managing multiple official Codex / ChatGPT auth files, checking usage, and switching accounts with encrypted storage.
 
+[中文说明](./README.zh-CN.md)
+
 This project is designed for users who already use the official Codex app or CLI and want a safer local account switcher. It does not provide or bypass OpenAI login. Login still happens through official Codex.
 
 ## Features
@@ -156,6 +158,21 @@ The launcher reads `HTTP_PROXY`, `HTTPS_PROXY`, and Windows user proxy settings.
 Yes, if they are on Windows and have Node.js/npm installed. The repository contains the source code, launcher, installer script, tests, and dependency lockfile.
 
 It is not currently a signed `.exe` installer. Users install it from source with the PowerShell script above. This keeps the distribution transparent: dependencies are installed from `package-lock.json`, and the app can be inspected before running.
+
+## About a Single EXE Build
+
+Bundling this project into a single Windows installer or executable is not automatically less secure. The security model can remain the same if the package contains only the app code and runtime dependencies.
+
+The risks move to distribution and supply chain:
+
+- the release artifact should be built from a clean checkout;
+- runtime data such as `auth.json`, `accounts-store.json`, `.dpapi` backups, and `.env` files must never be bundled;
+- the build should use a lockfile and reproducible steps;
+- users should be able to verify the source commit used for a release;
+- production releases should ideally be code-signed;
+- auto-update, if added later, needs signature verification.
+
+For now, source installation is the safer transparent default for a public project. A signed installer can be added later without changing the local security model.
 
 ## Development
 
