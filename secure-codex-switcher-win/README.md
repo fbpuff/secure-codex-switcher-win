@@ -98,8 +98,28 @@ Open `设置 / Settings` from the left rail to change:
 - Manual switch confirmation.
 - Window close behavior: ask every time, minimize to the taskbar, or quit the app.
 - Open the `%USERPROFILE%\.codex` folder.
+- Fully quit the Switcher app.
 
-On the first window close, the app asks whether to minimize or quit. If you choose `Always use this action`, the choice is saved locally in `settings.json`. No account tokens or API keys are stored in settings.
+Current UI direction:
+
+- Account management and settings are separate views, so the account search/list UI does not overlap the settings page.
+- The left rail only keeps account navigation and settings navigation. The `.codex` folder opener lives inside `设置 / Settings -> 应用 / App`.
+- Low-quota warning and auto-switch controls are grouped vertically in one compact account-page control.
+- Color theme uses a three-option segmented control instead of a dropdown.
+
+Close behavior:
+
+- On the first window close, the app asks whether to minimize or quit. If you choose `Always use this action`, the choice is saved locally in `settings.json`.
+- If close behavior is set to `Minimize window`, clicking the window close button minimizes the app.
+- To fully quit after minimizing, either use `设置 / Settings -> 应用 / App -> 退出应用 / Quit App`, or right-click the minimized taskbar window and choose `关闭窗口 / Close window`.
+- No account tokens or API keys are stored in settings.
+
+Relevant implementation paths:
+
+- Main close/quit behavior: `src/main.js`.
+- Renderer IPC allowlist for quit: `src/preload.cjs`.
+- Settings UI and event handling: `src/renderer/index.html` and `src/renderer/app.js`.
+- Settings layout and theme styles: `src/renderer/styles.css`.
 
 ## Current scope
 

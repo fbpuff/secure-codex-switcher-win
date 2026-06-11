@@ -152,6 +152,41 @@ GUI 会导入官方 Codex 的 auth 文件：
 
 启动脚本会读取 `HTTP_PROXY`、`HTTPS_PROXY` 和 Windows 当前用户代理设置。
 
+## 设置与退出
+
+从左侧栏打开 `设置 / Settings` 可以修改：
+
+- 界面语言。
+- 颜色主题：跟随系统、亮色、暗色。
+- 用量自动刷新间隔。
+- 低余量提醒。
+- 当前账号用尽后的自动切换。
+- 手动切换前确认。
+- 窗口关闭行为。
+- 打开 `%USERPROFILE%\.codex` 文件夹。
+- 彻底退出 Switcher 应用。
+
+当前界面调整方向：
+
+- 账号管理和设置页拆成独立视图，避免账号搜索框、账号列表遮挡设置内容。
+- 左侧栏只保留账号和设置两个导航入口；`.codex` 文件夹入口移动到 `设置 -> 应用`。
+- `低余量提醒` 和 `用尽后自动切换` 在账号页中改成上下排列的组合控件。
+- 颜色主题改成三段按钮，不再使用下拉框。
+
+关闭行为：
+
+- 首次关闭窗口时，应用会询问最小化还是退出；如果勾选“以后均保持此操作”，选择会保存到本地 `settings.json`。
+- 如果关闭行为设置为“最小化窗口”，点击窗口关闭按钮会最小化。
+- 最小化后想彻底退出，可以进入 `设置 -> 应用 -> 退出应用`，也可以在任务栏右键窗口并选择 `关闭窗口`。
+- `settings.json` 只保存行为配置，不保存账号 token 或 API key。
+
+相关实现路径：
+
+- 主进程关闭/退出逻辑：`secure-codex-switcher-win/src/main.js`。
+- Renderer 退出 IPC allowlist：`secure-codex-switcher-win/src/preload.cjs`。
+- 设置页结构和事件：`secure-codex-switcher-win/src/renderer/index.html`、`secure-codex-switcher-win/src/renderer/app.js`。
+- 设置页布局和主题样式：`secure-codex-switcher-win/src/renderer/styles.css`。
+
 ## 别人能否直接安装
 
 可以，只要对方是 Windows 且安装了 Node.js/npm。仓库里包含源码、启动脚本、安装脚本、测试和依赖锁文件。

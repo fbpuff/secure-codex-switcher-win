@@ -153,6 +153,41 @@ Common failures:
 
 The launcher reads `HTTP_PROXY`, `HTTPS_PROXY`, and Windows user proxy settings.
 
+## Settings and Window Exit
+
+Open `设置 / Settings` from the left rail to change:
+
+- UI language.
+- Color theme: follow system, light, or dark.
+- Usage auto-refresh interval.
+- Low-quota warning.
+- Auto-switch when the current account is exhausted.
+- Manual switch confirmation.
+- Window close behavior.
+- Open the `%USERPROFILE%\.codex` folder.
+- Fully quit the Switcher app.
+
+Current UI direction:
+
+- Account management and settings are separate views, so the account search/list UI does not overlap the settings page.
+- The left rail only keeps account navigation and settings navigation. The `.codex` folder opener lives inside `设置 / Settings -> 应用 / App`.
+- Low-quota warning and auto-switch controls are grouped vertically in one compact account-page control.
+- Color theme uses a three-option segmented control instead of a dropdown.
+
+Close behavior:
+
+- On first close, the app asks whether to minimize or quit. If you choose `Always use this action`, the choice is saved locally in `settings.json`.
+- If close behavior is set to `Minimize window`, clicking the window close button minimizes the app.
+- To fully quit after minimizing, either use `设置 / Settings -> 应用 / App -> 退出应用 / Quit App`, or right-click the minimized taskbar window and choose `关闭窗口 / Close window`.
+- No account tokens or API keys are stored in settings.
+
+Relevant implementation paths:
+
+- Main close/quit behavior: `secure-codex-switcher-win/src/main.js`.
+- Renderer IPC allowlist for quit: `secure-codex-switcher-win/src/preload.cjs`.
+- Settings UI and event handling: `secure-codex-switcher-win/src/renderer/index.html` and `secure-codex-switcher-win/src/renderer/app.js`.
+- Settings layout and theme styles: `secure-codex-switcher-win/src/renderer/styles.css`.
+
 ## Can Others Install Directly From This Repository?
 
 Yes, if they are on Windows and have Node.js/npm installed. The repository contains the source code, launcher, installer script, tests, and dependency lockfile.

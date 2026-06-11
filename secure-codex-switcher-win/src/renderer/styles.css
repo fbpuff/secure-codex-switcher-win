@@ -675,6 +675,11 @@ button:disabled {
   line-height: 1.45;
 }
 
+.settings-button-stack {
+  display: grid;
+  gap: 8px;
+}
+
 .settings-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
