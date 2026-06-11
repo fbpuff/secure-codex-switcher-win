@@ -17,11 +17,26 @@ const replacementSelect = document.querySelector("#replacement-select");
 const replacementField = document.querySelector("#replacement-field");
 const replacementConfirm = document.querySelector("#replacement-confirm");
 const languageSelect = document.querySelector("#language-select");
+const accountsNav = document.querySelector("#accounts-nav");
+const settingsNav = document.querySelector("#settings-nav");
+const accountsTopbar = document.querySelector("#accounts-topbar");
+const metricsStrip = document.querySelector("#metrics-strip");
+const accountsWorkspace = document.querySelector("#accounts-workspace");
+const settingsView = document.querySelector("#settings-view");
+const settingsLanguage = document.querySelector("#settings-language");
+const settingsAutoSwitch = document.querySelector("#settings-auto-switch");
+const settingsLowQuotaWarning = document.querySelector("#settings-low-quota-warning");
+const settingsRequireSwitchConfirmation = document.querySelector("#settings-require-switch-confirmation");
+const settingsRefreshInterval = document.querySelector("#settings-refresh-interval");
+const settingsOpenFolder = document.querySelector("#settings-open-folder");
+const closeDialog = document.querySelector("#close-dialog");
+const closeRemember = document.querySelector("#close-remember");
 
 const messages = {
   "zh-CN": {
     "brand.subtitle": "Windows Local",
     "nav.accounts": "账号",
+    "nav.settings": "设置",
     "rail.dpapi": "DPAPI protected",
     "top.eyebrow": "本机账号保险箱",
     "top.title": "账号余量与切换",
@@ -46,6 +61,34 @@ const messages = {
     "modal.loginNew": "登录新账号",
     "modal.loginNewHelp": "关闭官方 Codex，移除当前 auth.json，然后打开官方 Codex 登录。",
     "modal.replacement": "替代账号",
+    "settings.eyebrow": "基础行为",
+    "settings.title": "设置",
+    "settings.subtitle": "调整语言、余量刷新、切换确认和关闭窗口行为。",
+    "settings.accountManagement": "账号管理",
+    "settings.autoSwitch": "用尽后自动切换",
+    "settings.autoSwitchHelp": "当前账号余量耗尽时自动选择可用账号。",
+    "settings.confirmSwitch": "切换确认",
+    "settings.confirmSwitchHelp": "手动切换账号前先确认。",
+    "settings.lowWarning": "低余量提醒",
+    "settings.lowWarningHelp": "低于阈值时在账号页显示红色提醒。",
+    "settings.refreshTitle": "余量刷新",
+    "settings.refreshInterval": "自动刷新间隔",
+    "settings.minutes": "分钟",
+    "settings.refreshHelp": "修改后立即生效，手动刷新不受影响。",
+    "settings.interfaceTitle": "界面",
+    "settings.language": "语言",
+    "settings.closeBehavior": "关闭窗口行为",
+    "settings.closeAsk": "每次询问",
+    "settings.closeMinimize": "最小化窗口",
+    "settings.closeQuit": "关闭应用",
+    "settings.codexTitle": ".codex 文件夹",
+    "settings.codexHelp": "打开官方 Codex auth.json 所在目录。",
+    "settings.openCodexFolder": "打开 .codex",
+    "close.title": "关闭 Codex Switcher？",
+    "close.intro": "选择最小化到任务栏，或直接关闭应用。",
+    "close.remember": "以后均保持此操作",
+    "close.minimize": "最小化窗口",
+    "close.quit": "关闭应用",
     "status.ready": "准备就绪",
     "status.processing": "处理中...",
     "status.importedRefreshed": "已导入当前账号，并刷新了余量",
@@ -57,6 +100,11 @@ const messages = {
     "status.autoSwitchOff": "已关闭自动切换",
     "status.lowWarningOn": "已开启低余量提醒",
     "status.lowWarningOff": "已关闭低余量提醒",
+    "status.switchConfirmOn": "已开启切换确认",
+    "status.switchConfirmOff": "已关闭切换确认",
+    "status.refreshIntervalSaved": "余量自动刷新间隔已更新",
+    "status.closeBehaviorSaved": "关闭窗口行为已保存",
+    "status.settingsSaved": "设置已保存",
     "status.languageSaved": "语言已切换为中文",
     "status.backgroundUpdated": "后台余量已更新",
     "status.backgroundFailed": "后台余量刷新失败：{error}",
@@ -111,6 +159,7 @@ const messages = {
   en: {
     "brand.subtitle": "Windows Local",
     "nav.accounts": "Accounts",
+    "nav.settings": "Settings",
     "rail.dpapi": "DPAPI protected",
     "top.eyebrow": "Local account vault",
     "top.title": "Usage & Switching",
@@ -135,6 +184,34 @@ const messages = {
     "modal.loginNew": "Log in to new account",
     "modal.loginNewHelp": "Close official Codex, remove auth.json, then open official Codex for login.",
     "modal.replacement": "Replacement account",
+    "settings.eyebrow": "Basic behavior",
+    "settings.title": "Settings",
+    "settings.subtitle": "Adjust language, usage refresh, switch confirmation, and window close behavior.",
+    "settings.accountManagement": "Account Management",
+    "settings.autoSwitch": "Auto-switch on empty",
+    "settings.autoSwitchHelp": "Choose an available account when the current account is exhausted.",
+    "settings.confirmSwitch": "Switch confirmation",
+    "settings.confirmSwitchHelp": "Confirm before manually switching accounts.",
+    "settings.lowWarning": "Low-quota warning",
+    "settings.lowWarningHelp": "Show a red warning on the account page below the threshold.",
+    "settings.refreshTitle": "Usage Refresh",
+    "settings.refreshInterval": "Auto-refresh interval",
+    "settings.minutes": "minutes",
+    "settings.refreshHelp": "Changes apply immediately. Manual refresh is unaffected.",
+    "settings.interfaceTitle": "Interface",
+    "settings.language": "Language",
+    "settings.closeBehavior": "Window close behavior",
+    "settings.closeAsk": "Ask every time",
+    "settings.closeMinimize": "Minimize window",
+    "settings.closeQuit": "Quit app",
+    "settings.codexTitle": ".codex Folder",
+    "settings.codexHelp": "Open the folder where official Codex stores auth.json.",
+    "settings.openCodexFolder": "Open .codex",
+    "close.title": "Close Codex Switcher?",
+    "close.intro": "Choose whether to minimize to the taskbar or quit the app.",
+    "close.remember": "Always use this action",
+    "close.minimize": "Minimize Window",
+    "close.quit": "Quit App",
     "status.ready": "Ready",
     "status.processing": "Working...",
     "status.importedRefreshed": "Imported the current account and refreshed usage",
@@ -146,6 +223,11 @@ const messages = {
     "status.autoSwitchOff": "Auto-switch disabled",
     "status.lowWarningOn": "Low-quota warning enabled",
     "status.lowWarningOff": "Low-quota warning disabled",
+    "status.switchConfirmOn": "Switch confirmation enabled",
+    "status.switchConfirmOff": "Switch confirmation disabled",
+    "status.refreshIntervalSaved": "Usage auto-refresh interval updated",
+    "status.closeBehaviorSaved": "Window close behavior saved",
+    "status.settingsSaved": "Settings saved",
     "status.languageSaved": "Language switched to English",
     "status.backgroundUpdated": "Background usage updated",
     "status.backgroundFailed": "Background usage refresh failed: {error}",
@@ -206,9 +288,13 @@ let settings = {
   requireSwitchConfirmation: true,
   lowQuotaWarningEnabled: true,
   lowQuotaThresholdPercent: 15,
-  uiLanguage: "zh-CN"
+  uiLanguage: "zh-CN",
+  closeBehavior: "ask",
+  usageRefreshIntervalMinutes: 5
 };
 let autoSwitchInProgress = false;
+let backgroundRefreshTimer;
+let currentView = "accounts";
 
 document.querySelector("#import-current").addEventListener("click", runAction(async () => {
   const account = await api.importCurrentAuth();
@@ -241,44 +327,163 @@ document.querySelector("#open-folder").addEventListener("click", runAction(async
   await api.openCodexFolder();
 }));
 
+settingsOpenFolder.addEventListener("click", runAction(async () => {
+  await api.openCodexFolder();
+}));
+
+accountsNav.addEventListener("click", () => showView("accounts"));
+settingsNav.addEventListener("click", () => showView("settings"));
+
 autoSwitchInput.addEventListener("change", runAction(async () => {
   settings = await api.updateSettings({ autoSwitchEnabled: autoSwitchInput.checked });
+  syncSettingsControls();
   setStatus(t(autoSwitchInput.checked ? "status.autoSwitchOn" : "status.autoSwitchOff"));
   await evaluateQuotaActions("settings");
 }));
 
 lowQuotaWarningInput.addEventListener("change", runAction(async () => {
   settings = await api.updateSettings({ lowQuotaWarningEnabled: lowQuotaWarningInput.checked });
+  syncSettingsControls();
   setStatus(t(lowQuotaWarningInput.checked ? "status.lowWarningOn" : "status.lowWarningOff"));
 }));
 
 languageSelect.addEventListener("change", runAction(async () => {
-  settings = await api.updateSettings({ uiLanguage: languageSelect.value });
-  applyTranslations();
-  render();
-  setStatus(t("status.languageSaved"));
+  await saveLanguage(languageSelect.value);
 }));
 
 searchInput.addEventListener("input", () => render());
 
+settingsAutoSwitch.addEventListener("change", runAction(async () => {
+  settings = await api.updateSettings({ autoSwitchEnabled: settingsAutoSwitch.checked });
+  syncSettingsControls();
+  setStatus(t(settingsAutoSwitch.checked ? "status.autoSwitchOn" : "status.autoSwitchOff"));
+  await evaluateQuotaActions("settings");
+}));
+
+settingsLowQuotaWarning.addEventListener("change", runAction(async () => {
+  settings = await api.updateSettings({ lowQuotaWarningEnabled: settingsLowQuotaWarning.checked });
+  syncSettingsControls();
+  setStatus(t(settingsLowQuotaWarning.checked ? "status.lowWarningOn" : "status.lowWarningOff"));
+}));
+
+settingsRequireSwitchConfirmation.addEventListener("change", runAction(async () => {
+  settings = await api.updateSettings({ requireSwitchConfirmation: settingsRequireSwitchConfirmation.checked });
+  syncSettingsControls();
+  setStatus(t(settingsRequireSwitchConfirmation.checked ? "status.switchConfirmOn" : "status.switchConfirmOff"));
+}));
+
+settingsRefreshInterval.addEventListener("change", runAction(async () => {
+  settings = await api.updateSettings({ usageRefreshIntervalMinutes: Number(settingsRefreshInterval.value) });
+  syncSettingsControls();
+  startBackgroundRefreshTimer();
+  setStatus(t("status.refreshIntervalSaved"));
+}));
+
+settingsLanguage.addEventListener("change", runAction(async () => {
+  await saveLanguage(settingsLanguage.value);
+}));
+
+for (const input of document.querySelectorAll('input[name="settings-close-behavior"]')) {
+  input.addEventListener("change", runAction(async () => {
+    settings = await api.updateSettings({ closeBehavior: input.value });
+    syncSettingsControls();
+    setStatus(t("status.closeBehaviorSaved"));
+  }));
+}
+
+closeDialog.addEventListener("close", async () => {
+  const action = closeDialog.returnValue;
+  if (action !== "minimize" && action !== "quit") {
+    return;
+  }
+  try {
+    const result = await api.applyCloseDecision({ action, remember: closeRemember.checked });
+    if (result.remembered) {
+      settings = await api.readSettings();
+      syncSettingsControls();
+    }
+  } catch (error) {
+    setStatus(errorMessage(error));
+  } finally {
+    closeDialog.returnValue = "";
+  }
+});
+
+api.onCloseDecisionRequested(() => {
+  if (closeDialog.open) {
+    return;
+  }
+  closeDialog.returnValue = "";
+  closeRemember.checked = false;
+  closeDialog.showModal();
+});
+
 initialize();
-setInterval(() => {
-  api.refreshAllUsage()
-    .then((results) => loadAccounts(refreshSummary(results, t("status.backgroundUpdated")), { reason: "background" }))
-    .catch((error) => setStatus(t("status.backgroundFailed", { error: errorMessage(error) })));
-}, 5 * 60 * 1000);
 
 async function initialize() {
   await loadSettings();
   applyTranslations();
+  showView(currentView);
   await loadAccounts(t("status.ready"));
+  startBackgroundRefreshTimer();
 }
 
 async function loadSettings() {
   settings = await api.readSettings();
+  syncSettingsControls();
+}
+
+function syncSettingsControls() {
   autoSwitchInput.checked = Boolean(settings.autoSwitchEnabled);
   lowQuotaWarningInput.checked = Boolean(settings.lowQuotaWarningEnabled);
   languageSelect.value = settings.uiLanguage === "en" ? "en" : "zh-CN";
+  settingsAutoSwitch.checked = Boolean(settings.autoSwitchEnabled);
+  settingsLowQuotaWarning.checked = Boolean(settings.lowQuotaWarningEnabled);
+  settingsRequireSwitchConfirmation.checked = settings.requireSwitchConfirmation !== false;
+  settingsLanguage.value = settings.uiLanguage === "en" ? "en" : "zh-CN";
+  settingsRefreshInterval.value = String(clampRefreshInterval(settings.usageRefreshIntervalMinutes));
+  const closeBehavior = settings.closeBehavior === "minimize" || settings.closeBehavior === "quit" ? settings.closeBehavior : "ask";
+  const closeInput = document.querySelector(`input[name="settings-close-behavior"][value="${closeBehavior}"]`);
+  if (closeInput) {
+    closeInput.checked = true;
+  }
+}
+
+async function saveLanguage(uiLanguage) {
+  settings = await api.updateSettings({ uiLanguage });
+  syncSettingsControls();
+  applyTranslations();
+  render();
+  setStatus(t("status.languageSaved"));
+}
+
+function showView(view) {
+  currentView = view === "settings" ? "settings" : "accounts";
+  const showingSettings = currentView === "settings";
+  accountsTopbar.hidden = showingSettings;
+  metricsStrip.hidden = showingSettings;
+  accountsWorkspace.hidden = showingSettings;
+  settingsView.hidden = !showingSettings;
+  accountsNav.classList.toggle("active", !showingSettings);
+  settingsNav.classList.toggle("active", showingSettings);
+}
+
+function startBackgroundRefreshTimer() {
+  if (backgroundRefreshTimer) {
+    clearInterval(backgroundRefreshTimer);
+  }
+  backgroundRefreshTimer = setInterval(refreshAllUsageInBackground, clampRefreshInterval(settings.usageRefreshIntervalMinutes) * 60 * 1000);
+}
+
+function refreshAllUsageInBackground() {
+  api.refreshAllUsage()
+    .then((results) => loadAccounts(refreshSummary(results, t("status.backgroundUpdated")), { reason: "background" }))
+    .catch((error) => setStatus(t("status.backgroundFailed", { error: errorMessage(error) })));
+}
+
+function clampRefreshInterval(value) {
+  const minutes = Number(value);
+  return Number.isFinite(minutes) ? Math.round(Math.max(1, Math.min(60, minutes))) : 5;
 }
 
 async function loadAccounts(message, options = {}) {

@@ -68,7 +68,7 @@ Refresh behavior:
 - Clicking `导入/新增当前` refreshes that imported account once.
 - Clicking `刷新全部` refreshes all accounts immediately.
 - Clicking an account's `刷新` button refreshes that account immediately.
-- While the GUI is open, it refreshes all accounts every 5 minutes in the background.
+- While the GUI is open, it refreshes all accounts in the background. The interval defaults to 5 minutes and can be changed in `设置 / Settings`.
 - If `低余量提醒` is enabled, the app shows a red inline warning when the current account drops to 15% remaining or below.
 - If `用尽后自动切换` is enabled, the app switches directly to the best fresh non-current account only when the current account is exhausted. The 15% threshold is just a warning.
 - Switching writes `%USERPROFILE%\.codex\auth.json`, closes official Codex processes, and then starts official Codex again so the new account is loaded.
@@ -85,6 +85,20 @@ HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings
 ```
 
 For example, a local proxy such as `127.0.0.1:7897` will be normalized to `http://127.0.0.1:7897`.
+
+## Settings
+
+Open `设置 / Settings` from the left rail to change:
+
+- UI language.
+- Usage auto-refresh interval, from 1 to 60 minutes.
+- Low-quota warning.
+- Auto-switch when the current account is exhausted.
+- Manual switch confirmation.
+- Window close behavior: ask every time, minimize to the taskbar, or quit the app.
+- Open the `%USERPROFILE%\.codex` folder.
+
+On the first window close, the app asks whether to minimize or quit. If you choose `Always use this action`, the choice is saved locally in `settings.json`. No account tokens or API keys are stored in settings.
 
 ## Current scope
 

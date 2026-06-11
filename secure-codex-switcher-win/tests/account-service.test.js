@@ -173,10 +173,22 @@ test("fills missing legacy settings with safe defaults", { skip: process.platfor
   assert.equal(settings.lowQuotaThresholdPercent, 15);
   assert.equal(settings.autoSwitchEnabled, true);
   assert.equal(settings.uiLanguage, "zh-CN");
+  assert.equal(settings.closeBehavior, "ask");
+  assert.equal(settings.usageRefreshIntervalMinutes, 5);
 
-  const updated = service.updateSettings({ uiLanguage: "en" });
+  const updated = service.updateSettings({ uiLanguage: "en", closeBehavior: "minimize", usageRefreshIntervalMinutes: 0 });
   assert.equal(updated.uiLanguage, "en");
+  assert.equal(updated.closeBehavior, "minimize");
+  assert.equal(updated.usageRefreshIntervalMinutes, 1);
   assert.equal(service.readSettings().uiLanguage, "en");
+
+  const clamped = service.updateSettings({ closeBehavior: "quit", usageRefreshIntervalMinutes: 99 });
+  assert.equal(clamped.closeBehavior, "quit");
+  assert.equal(clamped.usageRefreshIntervalMinutes, 60);
+
+  const unchanged = service.updateSettings({ closeBehavior: "invalid", usageRefreshIntervalMinutes: 10 });
+  assert.equal(unchanged.closeBehavior, "quit");
+  assert.equal(unchanged.usageRefreshIntervalMinutes, 10);
 });
 
 test("migrates plaintext auth backups to DPAPI encrypted files", { skip: process.platform !== "win32" }, () => {

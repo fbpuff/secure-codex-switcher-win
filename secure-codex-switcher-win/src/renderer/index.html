@@ -22,13 +22,17 @@
         </div>
 
         <nav class="nav-stack" aria-label="Primary">
-          <button class="nav-item active" type="button">
+          <button id="accounts-nav" class="nav-item active" type="button">
             <span class="nav-icon accounts-icon" aria-hidden="true"></span>
             <span data-i18n="nav.accounts">账号</span>
           </button>
           <button id="open-folder" class="nav-item" type="button">
             <span class="nav-icon folder-icon" aria-hidden="true"></span>
             <span>.codex</span>
+          </button>
+          <button id="settings-nav" class="nav-item" type="button">
+            <span class="nav-icon settings-icon" aria-hidden="true"></span>
+            <span data-i18n="nav.settings">设置</span>
           </button>
         </nav>
 
@@ -39,7 +43,7 @@
       </aside>
 
       <main class="workspace">
-        <header class="topbar">
+        <header id="accounts-topbar" class="topbar">
           <div>
             <span class="eyebrow" data-i18n="top.eyebrow">本机账号保险箱</span>
             <h2 data-i18n="top.title">账号余量与切换</h2>
@@ -69,7 +73,7 @@
           </div>
         </header>
 
-        <section class="metrics-strip" aria-label="Summary">
+        <section id="metrics-strip" class="metrics-strip" aria-label="Summary">
           <article class="metric">
             <span data-i18n="metrics.total">账号数</span>
             <strong id="metric-total">0</strong>
@@ -94,7 +98,7 @@
           </label>
         </section>
 
-        <section class="accounts-workspace">
+        <section id="accounts-workspace" class="accounts-workspace">
           <section class="list-panel" aria-label="Accounts">
             <div class="list-tools">
               <label class="search-field">
@@ -107,6 +111,90 @@
           </section>
 
           <aside id="detail" class="detail-panel" aria-label="Account detail"></aside>
+        </section>
+
+        <section id="settings-view" class="settings-view" hidden>
+          <header class="settings-header">
+            <div>
+              <span class="eyebrow" data-i18n="settings.eyebrow">基础行为</span>
+              <h2 data-i18n="settings.title">设置</h2>
+              <p data-i18n="settings.subtitle">调整语言、余量刷新、切换确认和关闭窗口行为。</p>
+            </div>
+          </header>
+
+          <div class="settings-grid">
+            <section class="settings-section">
+              <h3 data-i18n="settings.accountManagement">账号管理</h3>
+              <label class="settings-row">
+                <span>
+                  <strong data-i18n="settings.autoSwitch">用尽后自动切换</strong>
+                  <small data-i18n="settings.autoSwitchHelp">当前账号余量耗尽时自动选择可用账号。</small>
+                </span>
+                <input id="settings-auto-switch" type="checkbox" />
+              </label>
+              <label class="settings-row">
+                <span>
+                  <strong data-i18n="settings.confirmSwitch">切换确认</strong>
+                  <small data-i18n="settings.confirmSwitchHelp">手动切换账号前先确认。</small>
+                </span>
+                <input id="settings-require-switch-confirmation" type="checkbox" />
+              </label>
+              <label class="settings-row">
+                <span>
+                  <strong data-i18n="settings.lowWarning">低余量提醒</strong>
+                  <small data-i18n="settings.lowWarningHelp">低于阈值时在账号页显示红色提醒。</small>
+                </span>
+                <input id="settings-low-quota-warning" type="checkbox" />
+              </label>
+            </section>
+
+            <section class="settings-section">
+              <h3 data-i18n="settings.refreshTitle">余量刷新</h3>
+              <label class="settings-field">
+                <span data-i18n="settings.refreshInterval">自动刷新间隔</span>
+                <div class="inline-input">
+                  <input id="settings-refresh-interval" type="number" min="1" max="60" step="1" />
+                  <span data-i18n="settings.minutes">分钟</span>
+                </div>
+                <small data-i18n="settings.refreshHelp">修改后立即生效，手动刷新不受影响。</small>
+              </label>
+            </section>
+
+            <section class="settings-section">
+              <h3 data-i18n="settings.interfaceTitle">界面</h3>
+              <label class="settings-field">
+                <span data-i18n="settings.language">语言</span>
+                <select id="settings-language">
+                  <option value="zh-CN">中文</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+              <fieldset class="settings-field radio-stack">
+                <legend data-i18n="settings.closeBehavior">关闭窗口行为</legend>
+                <label>
+                  <input name="settings-close-behavior" value="ask" type="radio" />
+                  <span data-i18n="settings.closeAsk">每次询问</span>
+                </label>
+                <label>
+                  <input name="settings-close-behavior" value="minimize" type="radio" />
+                  <span data-i18n="settings.closeMinimize">最小化窗口</span>
+                </label>
+                <label>
+                  <input name="settings-close-behavior" value="quit" type="radio" />
+                  <span data-i18n="settings.closeQuit">关闭应用</span>
+                </label>
+              </fieldset>
+            </section>
+
+            <section class="settings-section">
+              <h3 data-i18n="settings.codexTitle">.codex 文件夹</h3>
+              <p data-i18n="settings.codexHelp">打开官方 Codex auth.json 所在目录。</p>
+              <button id="settings-open-folder" type="button">
+                <span class="button-icon folder-icon" aria-hidden="true"></span>
+                <span data-i18n="settings.openCodexFolder">打开 .codex</span>
+              </button>
+            </section>
+          </div>
         </section>
       </main>
     </div>
@@ -170,6 +258,21 @@
         <div class="modal-actions">
           <button value="cancel" type="submit" data-i18n="actions.cancel">取消</button>
           <button id="replacement-confirm" class="primary-action" value="confirm" type="submit">继续</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="close-dialog" class="modal-dialog">
+      <form method="dialog" class="modal-panel">
+        <h3 data-i18n="close.title">关闭 Codex Switcher？</h3>
+        <p data-i18n="close.intro">选择最小化到任务栏，或直接关闭应用。</p>
+        <label class="remember-row">
+          <input id="close-remember" type="checkbox" />
+          <span data-i18n="close.remember">以后均保持此操作</span>
+        </label>
+        <div class="modal-actions">
+          <button value="minimize" type="submit" data-i18n="close.minimize">最小化窗口</button>
+          <button class="danger" value="quit" type="submit" data-i18n="close.quit">关闭应用</button>
         </div>
       </form>
     </dialog>
