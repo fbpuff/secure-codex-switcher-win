@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --bg: #f4f6f7;
   --surface: #ffffff;
   --surface-muted: #f8fafb;
@@ -16,10 +17,85 @@
   --danger: #a23838;
   --danger-soft: #f7e7e7;
   --rail: #172229;
+  --hover-surface: #f1f8f7;
+  --list-bg: #fbfcfd;
+  --row-selected-bg: linear-gradient(180deg, #ffffff, #f7fbfa);
+  --toggle-bg: #cfd8de;
+  --avatar-bg: #dfe8e7;
+  --ring-empty: rgba(20, 32, 38, 0.09);
+  --dialog-backdrop: rgba(20, 32, 38, 0.38);
+  --focus-ring: rgba(11, 140, 136, 0.10);
+  --card-shadow: rgba(20, 32, 38, 0.06);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #11171a;
+  --surface: #182125;
+  --surface-muted: #202a2f;
+  --ink: #eef5f4;
+  --muted: #9eb0b7;
+  --line: #344147;
+  --line-soft: #263238;
+  --accent: #23a7a0;
+  --accent-strong: #67d6ce;
+  --accent-soft: #153733;
+  --success: #59c995;
+  --success-soft: #17392b;
+  --info: #8fb0ef;
+  --info-soft: #1a2c49;
+  --danger: #ef8e8e;
+  --danger-soft: #442525;
+  --rail: #0e1518;
+  --hover-surface: #203135;
+  --list-bg: #141d21;
+  --row-selected-bg: linear-gradient(180deg, #1a2529, #172226);
+  --toggle-bg: #4b5a60;
+  --avatar-bg: #243536;
+  --ring-empty: rgba(238, 245, 244, 0.12);
+  --dialog-backdrop: rgba(0, 0, 0, 0.58);
+  --focus-ring: rgba(35, 167, 160, 0.22);
+  --card-shadow: rgba(0, 0, 0, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --bg: #11171a;
+    --surface: #182125;
+    --surface-muted: #202a2f;
+    --ink: #eef5f4;
+    --muted: #9eb0b7;
+    --line: #344147;
+    --line-soft: #263238;
+    --accent: #23a7a0;
+    --accent-strong: #67d6ce;
+    --accent-soft: #153733;
+    --success: #59c995;
+    --success-soft: #17392b;
+    --info: #8fb0ef;
+    --info-soft: #1a2c49;
+    --danger: #ef8e8e;
+    --danger-soft: #442525;
+    --rail: #0e1518;
+    --hover-surface: #203135;
+    --list-bg: #141d21;
+    --row-selected-bg: linear-gradient(180deg, #1a2529, #172226);
+    --toggle-bg: #4b5a60;
+    --avatar-bg: #243536;
+    --ring-empty: rgba(238, 245, 244, 0.12);
+    --dialog-backdrop: rgba(0, 0, 0, 0.58);
+    --focus-ring: rgba(35, 167, 160, 0.22);
+    --card-shadow: rgba(0, 0, 0, 0.28);
+  }
 }
 
 * {
   box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -56,7 +132,7 @@ button {
 
 button:hover:not(:disabled) {
   border-color: rgba(11, 140, 136, 0.35);
-  background: #f1f8f7;
+  background: var(--hover-surface);
 }
 
 button:disabled {
@@ -464,7 +540,7 @@ button:disabled {
   width: 38px;
   height: 22px;
   border-radius: 999px;
-  background: #cfd8de;
+  background: var(--toggle-bg);
 }
 
 .toggle-visual::after {
@@ -651,7 +727,7 @@ button:disabled {
 
 .list-panel {
   border-right: 1px solid var(--line-soft);
-  background: #fbfcfd;
+  background: var(--list-bg);
   padding: 18px 22px 28px 30px;
 }
 
@@ -680,7 +756,7 @@ button:disabled {
 
 .search-field input:focus {
   border-color: rgba(11, 140, 136, 0.48);
-  box-shadow: 0 0 0 3px rgba(11, 140, 136, 0.10);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .search-icon {
@@ -738,11 +814,11 @@ button:disabled {
 .account-row:hover,
 .account-row.selected {
   border-color: rgba(11, 140, 136, 0.28);
-  box-shadow: 0 8px 24px rgba(20, 32, 38, 0.06);
+  box-shadow: 0 8px 24px var(--card-shadow);
 }
 
 .account-row.selected {
-  background: linear-gradient(180deg, #ffffff, #f7fbfa);
+  background: var(--row-selected-bg);
 }
 
 .account-row-main,
@@ -764,7 +840,7 @@ button:disabled {
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: #dfe8e7;
+  background: var(--avatar-bg);
   color: var(--accent-strong);
   font-weight: 620;
 }
@@ -857,7 +933,7 @@ button:disabled {
   border-radius: 999px;
   background:
     radial-gradient(circle at center, var(--surface) 0 61%, transparent 62%),
-    conic-gradient(var(--quota-tint) 0 var(--quota-progress), rgba(20, 32, 38, 0.09) var(--quota-progress) 100%);
+    conic-gradient(var(--quota-tint) 0 var(--quota-progress), var(--ring-empty) var(--quota-progress) 100%);
 }
 
 .quota-ring-card.success {
@@ -1134,7 +1210,7 @@ button:disabled {
 }
 
 .modal-dialog::backdrop {
-  background: rgba(20, 32, 38, 0.38);
+  background: var(--dialog-backdrop);
 }
 
 .modal-panel {

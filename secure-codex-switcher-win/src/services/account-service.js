@@ -279,6 +279,7 @@ class AccountService {
           : current.lowQuotaThresholdPercent,
       uiLanguage: patch?.uiLanguage === "en" || patch?.uiLanguage === "zh-CN" ? patch.uiLanguage : current.uiLanguage,
       closeBehavior: isCloseBehavior(patch?.closeBehavior) ? patch.closeBehavior : current.closeBehavior,
+      themeMode: isThemeMode(patch?.themeMode) ? patch.themeMode : current.themeMode,
       usageRefreshIntervalMinutes:
         Number.isFinite(patch?.usageRefreshIntervalMinutes)
           ? Math.round(Math.max(1, Math.min(60, Number(patch.usageRefreshIntervalMinutes))))
@@ -401,12 +402,17 @@ function normalizeSettings(value) {
     lowQuotaThresholdPercent: Number.isFinite(threshold) ? Math.max(1, Math.min(50, threshold)) : 15,
     uiLanguage: value?.uiLanguage === "en" ? "en" : "zh-CN",
     closeBehavior: isCloseBehavior(value?.closeBehavior) ? value.closeBehavior : "ask",
+    themeMode: isThemeMode(value?.themeMode) ? value.themeMode : "system",
     usageRefreshIntervalMinutes: Number.isFinite(refreshInterval) ? Math.round(Math.max(1, Math.min(60, refreshInterval))) : 5
   };
 }
 
 function isCloseBehavior(value) {
   return value === "ask" || value === "minimize" || value === "quit";
+}
+
+function isThemeMode(value) {
+  return value === "system" || value === "light" || value === "dark";
 }
 
 function normalizeDeleteOptions(value) {

@@ -91,6 +91,7 @@ For example, a local proxy such as `127.0.0.1:7897` will be normalized to `http:
 Open `设置 / Settings` from the left rail to change:
 
 - UI language.
+- Color theme: follow system, light, or dark.
 - Usage auto-refresh interval, from 1 to 60 minutes.
 - Low-quota warning.
 - Auto-switch when the current account is exhausted.
