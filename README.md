@@ -196,6 +196,7 @@ Current UI direction:
 - The left rail only keeps account navigation and settings navigation. The `.codex` folder opener lives inside `设置 / Settings -> 应用 / App`.
 - Low-quota warning and auto-switch controls are grouped vertically in one compact account-page control.
 - Color theme uses a three-option segmented control instead of a dropdown.
+- Selecting an account now updates only the selected row state and the detail panel, so the left account list keeps its scroll position instead of jumping back to the top.
 
 Close behavior:
 
