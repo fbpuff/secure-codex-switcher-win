@@ -690,6 +690,7 @@ function renderAccounts() {
   for (const account of filtered) {
     const node = template.content.firstElementChild.cloneNode(true);
     translateTree(node);
+    node.dataset.accountId = account.id;
     node.classList.toggle("current", account.isCurrent);
     node.classList.toggle("selected", account.id === selectedAccountId);
     node.querySelector('[data-field="avatar"]').textContent = initials(account);
@@ -703,14 +704,12 @@ function renderAccounts() {
     node.querySelector('[data-field="week-ring"]').replaceChildren(usageRing("7d", account.usage?.oneWeek));
     node.querySelector('[data-field="error"]').textContent = account.usageError ?? "";
     node.addEventListener("click", () => {
-      selectedAccountId = account.id;
-      render();
+      selectAccount(account.id);
     });
     node.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        selectedAccountId = account.id;
-        render();
+        selectAccount(account.id);
       }
     });
     node.querySelector('[data-action="switch"]').disabled = account.isCurrent;
@@ -722,6 +721,14 @@ function renderAccounts() {
     node.querySelector('[data-action="delete"]').addEventListener("click", stopAndRun(async () => deleteAccount(account)));
     accountsEl.append(node);
   }
+}
+
+function selectAccount(accountId) {
+  selectedAccountId = accountId;
+  for (const row of accountsEl.querySelectorAll(".account-row")) {
+    row.classList.toggle("selected", row.dataset.accountId === accountId);
+  }
+  renderDetail();
 }
 
 function renderDetail() {
