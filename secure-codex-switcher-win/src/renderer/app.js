@@ -131,7 +131,8 @@ const messages = {
     "status.backgroundFailed": "后台余量刷新失败：{error}",
     "status.exhaustedNoTarget": "当前账号已用尽，但没有可切换账号",
     "status.autoSwitched": "当前账号已用尽，已自动切换到 {email}，并关闭 {count} 个 Codex 进程。",
-    "status.autoSwitchDeferred": "当前账号已用尽，但检测到 {count} 个 Codex 进程正在运行。为避免打断正在进行的对话，已暂缓自动切换；请结束当前对话或关闭 Codex 后再手动切换。",
+    "status.autoSwitchQueued": "当前账号已用尽，已排队切换到 {email}。检测到 {count} 个 Codex 进程，关闭 Codex 后将自动切换并重新打开。",
+    "status.autoSwitchQueueCleared": "当前账号余量已恢复，已取消排队切换。",
     "status.accountUsageRefreshed": "账号余量已刷新",
     "status.switched": "账号已切换到 {email}",
     "status.currentDeletedSwitched": "当前账号已删除，并切换到 {email}",
@@ -143,7 +144,8 @@ const messages = {
     "status.transportWarning": "HTTP-only 配置校验失败：{error}",
     "status.loginNew": "当前账号已删除，并关闭 {count} 个 Codex 进程。{launch}请在官方 Codex 完成新账号登录，然后回到这里点击“导入/新增当前”。",
     "status.refreshFailures": "{message}，{count} 个账号刷新失败",
-    "quota.empty": "当前账号余量已用尽，建议切换账号；如果已开启自动切换，应用会选择可用账号并关闭官方 Codex。",
+    "quota.empty": "当前账号余量已用尽，建议切换账号；如果已开启自动切换，应用会选择可用账号。",
+    "quota.pendingSwitch": "当前账号已用尽，已排队切换到 {email}。检测到 {count} 个 Codex 进程，关闭 Codex 后将自动切换并重新打开。",
     "quota.low": "当前账号余量只剩 {remaining}%，建议切换账号。",
     "empty.noAccounts": "还没有账号",
     "empty.noMatches": "没有匹配账号",
@@ -272,7 +274,8 @@ const messages = {
     "status.backgroundFailed": "Background usage refresh failed: {error}",
     "status.exhaustedNoTarget": "Current account is exhausted, but no switch target is available",
     "status.autoSwitched": "Current account is exhausted; switched to {email} and closed {count} Codex processes.",
-    "status.autoSwitchDeferred": "Current account is exhausted, but {count} Codex processes are running. Auto-switch was deferred to avoid interrupting an active conversation; finish the current run or close Codex, then switch manually.",
+    "status.autoSwitchQueued": "Current account is exhausted; queued switch to {email}. {count} Codex processes are running. Close Codex and the switcher will switch automatically, then reopen Codex.",
+    "status.autoSwitchQueueCleared": "Current account usage recovered; queued switch was cancelled.",
     "status.accountUsageRefreshed": "Account usage refreshed",
     "status.switched": "Switched to {email}",
     "status.currentDeletedSwitched": "Current account deleted and switched to {email}",
@@ -284,7 +287,8 @@ const messages = {
     "status.transportWarning": "HTTP-only configuration check failed: {error}",
     "status.loginNew": "Current account deleted and {count} Codex processes were closed. {launch}Finish login in official Codex, then return here and click Import/Add Current.",
     "status.refreshFailures": "{message}, {count} accounts failed",
-    "quota.empty": "The current account is exhausted. Switch accounts; if auto-switch is enabled, the app will choose a usable account and close official Codex.",
+    "quota.empty": "The current account is exhausted. Switch accounts; if auto-switch is enabled, the app will choose a usable account.",
+    "quota.pendingSwitch": "Current account is exhausted; queued switch to {email}. {count} Codex processes are running. Close Codex and the switcher will switch automatically, then reopen Codex.",
     "quota.low": "Current account has only {remaining}% remaining. Consider switching.",
     "empty.noAccounts": "No accounts yet",
     "empty.noMatches": "No matching accounts",
@@ -339,7 +343,11 @@ let settings = {
 };
 let autoSwitchInProgress = false;
 let backgroundRefreshTimer;
+let pendingAutoSwitch;
+let pendingAutoSwitchTimer;
+let pendingAutoSwitchCheckInProgress = false;
 let currentView = "accounts";
+const pendingAutoSwitchIntervalMs = 15_000;
 
 document.querySelector("#import-current").addEventListener("click", runAction(async () => {
   const account = await api.importCurrentAuth();
@@ -700,6 +708,15 @@ function renderMetrics() {
 }
 
 function renderQuotaWarning() {
+  if (pendingAutoSwitch) {
+    quotaWarningLine.hidden = false;
+    quotaWarningLine.textContent = t("quota.pendingSwitch", {
+      email: pendingAutoSwitch.emailMasked,
+      count: pendingAutoSwitch.runningCodexProcesses ?? 0
+    });
+    return;
+  }
+
   const current = accounts.find((account) => account.isCurrent);
   if (!hasFreshUsableUsage(current)) {
     quotaWarningLine.hidden = true;
@@ -734,30 +751,151 @@ async function evaluateQuotaActions(reason) {
     return;
   }
 
+  if (!settings.autoSwitchEnabled && pendingAutoSwitch) {
+    clearPendingAutoSwitch();
+  }
+
+  if (pendingAutoSwitch && remaining > 0) {
+    clearPendingAutoSwitch();
+    setStatus(t("status.autoSwitchQueueCleared"));
+    renderQuotaWarning();
+    return;
+  }
+
   if (settings.autoSwitchEnabled && remaining <= 0 && reason !== "manual-switch") {
-    const best = await api.pickBestAccount();
-    const target = best.account?.id !== current.id ? best.account : undefined;
+    const target = await findAutoSwitchTarget(current.id);
     if (!target) {
+      clearPendingAutoSwitch();
       setStatus(t("status.exhaustedNoTarget"));
+      renderQuotaWarning();
       return;
     }
-    autoSwitchInProgress = true;
-    try {
-      const result = await api.switchAccount(target.id, { deferIfCodexRunning: true });
-      if (result.deferred) {
-        setStatus(t("status.autoSwitchDeferred", { count: result.runningCodexProcesses ?? 0 }));
-        renderQuotaWarning();
-        return;
-      }
-      selectedAccountId = target.id;
-      await loadAccounts(t("status.autoSwitched", { email: target.emailMasked, count: result.closedCodexProcesses ?? 0 }), { reason: "auto-switch" });
-    } finally {
-      autoSwitchInProgress = false;
-    }
+    await queueOrRunAutoSwitch(target);
     return;
   }
 
   renderQuotaWarning();
+}
+
+async function findAutoSwitchTarget(currentAccountId) {
+  const best = await api.pickBestAccount();
+  if (
+    best.account?.id &&
+    best.account.id !== currentAccountId &&
+    hasFreshUsableUsage(best.account) &&
+    lowestRemaining(best.account) > 0
+  ) {
+    return best.account;
+  }
+  return accounts.find((account) => account.id !== currentAccountId && hasFreshUsableUsage(account) && lowestRemaining(account) > 0);
+}
+
+async function queueOrRunAutoSwitch(target) {
+  if (pendingAutoSwitch?.accountId === target.id) {
+    renderQuotaWarning();
+    return;
+  }
+
+  const runningCodexProcesses = await api.countCodexProcesses();
+  if (runningCodexProcesses > 0) {
+    setPendingAutoSwitch(target, runningCodexProcesses);
+    return;
+  }
+
+  await runQueuedAutoSwitch(target);
+}
+
+function setPendingAutoSwitch(target, runningCodexProcesses) {
+  pendingAutoSwitch = {
+    accountId: target.id,
+    emailMasked: target.emailMasked,
+    createdAt: Date.now(),
+    runningCodexProcesses
+  };
+  startPendingAutoSwitchTimer();
+  setStatus(t("status.autoSwitchQueued", { email: target.emailMasked, count: runningCodexProcesses }));
+  renderQuotaWarning();
+}
+
+function clearPendingAutoSwitch() {
+  pendingAutoSwitch = undefined;
+  stopPendingAutoSwitchTimer();
+}
+
+function startPendingAutoSwitchTimer() {
+  if (pendingAutoSwitchTimer) {
+    return;
+  }
+  pendingAutoSwitchTimer = setInterval(checkPendingAutoSwitch, pendingAutoSwitchIntervalMs);
+}
+
+function stopPendingAutoSwitchTimer() {
+  if (!pendingAutoSwitchTimer) {
+    return;
+  }
+  clearInterval(pendingAutoSwitchTimer);
+  pendingAutoSwitchTimer = undefined;
+}
+
+async function checkPendingAutoSwitch() {
+  if (!pendingAutoSwitch || autoSwitchInProgress || pendingAutoSwitchCheckInProgress) {
+    return;
+  }
+
+  pendingAutoSwitchCheckInProgress = true;
+  try {
+    const latestAccounts = await api.listAccounts();
+    accounts = latestAccounts;
+    const current = accounts.find((account) => account.isCurrent);
+    if (current && hasFreshUsableUsage(current)) {
+      const remaining = lowestRemaining(current);
+      if (remaining !== undefined && remaining > 0) {
+        clearPendingAutoSwitch();
+        render();
+        setStatus(t("status.autoSwitchQueueCleared"));
+        return;
+      }
+    }
+
+    let target = accounts.find((account) => account.id === pendingAutoSwitch.accountId);
+    if (!target || !hasFreshUsableUsage(target) || lowestRemaining(target) <= 0) {
+      target = await findAutoSwitchTarget(current?.id);
+      if (!target) {
+        clearPendingAutoSwitch();
+        render();
+        setStatus(t("status.exhaustedNoTarget"));
+        return;
+      }
+      pendingAutoSwitch.accountId = target.id;
+      pendingAutoSwitch.emailMasked = target.emailMasked;
+    }
+
+    const runningCodexProcesses = await api.countCodexProcesses();
+    if (runningCodexProcesses > 0) {
+      pendingAutoSwitch.runningCodexProcesses = runningCodexProcesses;
+      render();
+      renderQuotaWarning();
+      return;
+    }
+
+    await runQueuedAutoSwitch(target);
+  } catch (error) {
+    setStatus(errorMessage(error));
+  } finally {
+    pendingAutoSwitchCheckInProgress = false;
+  }
+}
+
+async function runQueuedAutoSwitch(target) {
+  autoSwitchInProgress = true;
+  try {
+    const result = await api.switchAccount(target.id);
+    clearPendingAutoSwitch();
+    selectedAccountId = target.id;
+    await loadAccounts(t("status.autoSwitched", { email: target.emailMasked, count: result.closedCodexProcesses ?? 0 }), { reason: "auto-switch" });
+  } finally {
+    autoSwitchInProgress = false;
+  }
 }
 
 function renderAccounts() {
@@ -913,6 +1051,7 @@ async function switchAccount(account) {
     return;
   }
   const result = await api.switchAccount(account.id);
+  clearPendingAutoSwitch();
   selectedAccountId = account.id;
   await loadAccounts(switchMessage(t("status.switched", { email: account.emailMasked }), result), { reason: "manual-switch" });
 }
@@ -927,12 +1066,14 @@ async function deleteAccount(account) {
 
     if (action.mode === "login_new") {
       const result = await api.deleteAccount(account.id, { mode: "login_new" });
+      clearPendingAutoSwitch();
       selectedAccountId = undefined;
       await loadAccounts(loginNewMessage(result));
       return;
     }
 
     const result = await api.deleteAccount(account.id, { replacementAccountId: action.replacement.id });
+    clearPendingAutoSwitch();
     selectedAccountId = result.switchedTo?.id ?? action.replacement.id;
     await loadAccounts(switchMessage(t("status.currentDeletedSwitched", { email: action.replacement.emailMasked }), result));
     return;
@@ -942,6 +1083,9 @@ async function deleteAccount(account) {
     return;
   }
   const result = await api.deleteAccount(account.id);
+  if (pendingAutoSwitch?.accountId === account.id) {
+    clearPendingAutoSwitch();
+  }
   if (selectedAccountId === account.id) {
     selectedAccountId = undefined;
   }

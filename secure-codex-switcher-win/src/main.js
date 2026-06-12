@@ -111,6 +111,7 @@ function registerIpc() {
       mainWindow?.minimize();
       return { action, remembered };
     },
+    "app:countCodexProcesses": () => accountService.countOfficialCodexProcesses(),
     "system:openCodexFolder": () => shell.openPath(accountService.codexDir)
   };
 

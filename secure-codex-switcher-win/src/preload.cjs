@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("codexSwitcher", {
   setHttpOnlyMode: (enabled) => invoke("settings:setHttpOnly", enabled),
   quitApp: () => invoke("app:quit"),
   applyCloseDecision: (decision) => invoke("app:applyCloseDecision", decision),
+  countCodexProcesses: () => invoke("app:countCodexProcesses"),
   onCloseDecisionRequested: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("app:requestCloseDecision", handler);

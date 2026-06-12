@@ -131,6 +131,22 @@ test("deferred auto switch does not close running Codex", { skip: process.platfo
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(codexDir, "auth.json"), "utf8")), currentAuth);
 });
 
+test("counts official Codex processes without closing them", { skip: process.platform !== "win32" }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  let closedCodexProcesses = 0;
+  const service = createAccountService(userData, {
+    countCodexProcesses: () => 2,
+    closeCodexProcesses: () => {
+      closedCodexProcesses += 1;
+      return 2;
+    }
+  });
+
+  assert.equal(service.countOfficialCodexProcesses(), 2);
+  assert.equal(closedCodexProcesses, 0);
+});
+
 test("account switching still reopens Codex when HTTP-only config repair fails", { skip: process.platform !== "win32" }, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
   const userData = path.join(root, "appdata");

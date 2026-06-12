@@ -251,6 +251,10 @@ class AccountService {
     return best ? { account: best, score: remainingScore(best) } : { account: undefined, score: 0 };
   }
 
+  countOfficialCodexProcesses() {
+    return this.countCodexProcesses();
+  }
+
   syncCurrentAuth() {
     if (!fs.existsSync(this.codexAuthPath)) {
       return { synced: false };
