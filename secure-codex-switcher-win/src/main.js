@@ -85,7 +85,7 @@ function registerIpc() {
     "accounts:importCurrent": () => accountService.importCurrentAuth(),
     "accounts:refreshUsage": (_event, accountId, force) => accountService.refreshUsage(accountId, Boolean(force)),
     "accounts:refreshAllUsage": () => accountService.refreshAllUsage(),
-    "accounts:switch": (_event, accountId) => accountService.switchAccount(accountId),
+    "accounts:switch": (_event, accountId, options) => accountService.switchAccount(accountId, options),
     "accounts:delete": (_event, accountId, options) => accountService.deleteAccount(accountId, options),
     "accounts:pickBest": () => accountService.pickBestAccount(),
     "settings:read": () => accountService.readSettings(),

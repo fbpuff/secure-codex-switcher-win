@@ -23,6 +23,8 @@ const accountsView = document.querySelector("#accounts-view");
 const accountsTopbar = document.querySelector("#accounts-topbar");
 const metricsStrip = document.querySelector("#metrics-strip");
 const accountsWorkspace = document.querySelector("#accounts-workspace");
+const listPanel = document.querySelector(".list-panel");
+const accountsSplitter = document.querySelector("#accounts-splitter");
 const settingsView = document.querySelector("#settings-view");
 const settingsLanguage = document.querySelector("#settings-language");
 const settingsAutoSwitch = document.querySelector("#settings-auto-switch");
@@ -58,6 +60,8 @@ const messages = {
     "toggles.autoSwitch": "用尽后自动切换",
     "toggles.lowWarning": "低余量提醒",
     "search.placeholder": "搜索账号、计划、状态",
+    "splitter.resize": "调整账号列表和详情面板宽度",
+    "splitter.resizeTitle": "拖动调整左右宽度，双击恢复默认",
     "modal.deleteCurrentTitle": "删除当前账号",
     "modal.deleteCurrentIntro": "删除当前账号前，先选择接下来要让官方 Codex 使用哪个登录态。",
     "modal.switchExisting": "切换已有账号",
@@ -127,6 +131,7 @@ const messages = {
     "status.backgroundFailed": "后台余量刷新失败：{error}",
     "status.exhaustedNoTarget": "当前账号已用尽，但没有可切换账号",
     "status.autoSwitched": "当前账号已用尽，已自动切换到 {email}，并关闭 {count} 个 Codex 进程。",
+    "status.autoSwitchDeferred": "当前账号已用尽，但检测到 {count} 个 Codex 进程正在运行。为避免打断正在进行的对话，已暂缓自动切换；请结束当前对话或关闭 Codex 后再手动切换。",
     "status.accountUsageRefreshed": "账号余量已刷新",
     "status.switched": "账号已切换到 {email}",
     "status.currentDeletedSwitched": "当前账号已删除，并切换到 {email}",
@@ -196,6 +201,8 @@ const messages = {
     "toggles.autoSwitch": "Auto-switch on empty",
     "toggles.lowWarning": "Low-quota warning",
     "search.placeholder": "Search account, plan, status",
+    "splitter.resize": "Resize account list and detail panels",
+    "splitter.resizeTitle": "Drag to resize panels; double-click to reset",
     "modal.deleteCurrentTitle": "Delete Current",
     "modal.deleteCurrentIntro": "Choose which login state official Codex should use next.",
     "modal.switchExisting": "Switch to saved account",
@@ -265,6 +272,7 @@ const messages = {
     "status.backgroundFailed": "Background usage refresh failed: {error}",
     "status.exhaustedNoTarget": "Current account is exhausted, but no switch target is available",
     "status.autoSwitched": "Current account is exhausted; switched to {email} and closed {count} Codex processes.",
+    "status.autoSwitchDeferred": "Current account is exhausted, but {count} Codex processes are running. Auto-switch was deferred to avoid interrupting an active conversation; finish the current run or close Codex, then switch manually.",
     "status.accountUsageRefreshed": "Account usage refreshed",
     "status.switched": "Switched to {email}",
     "status.currentDeletedSwitched": "Current account deleted and switched to {email}",
@@ -326,6 +334,7 @@ let settings = {
   closeBehavior: "ask",
   themeMode: "system",
   httpOnlyModeEnabled: false,
+  accountListPanePercent: 46,
   usageRefreshIntervalMinutes: 5
 };
 let autoSwitchInProgress = false;
@@ -369,6 +378,12 @@ settingsQuitApp.addEventListener("click", runAction(async () => {
 
 accountsNav.addEventListener("click", () => showView("accounts"));
 settingsNav.addEventListener("click", () => showView("settings"));
+
+accountsSplitter.addEventListener("pointerdown", startPaneResize);
+accountsSplitter.addEventListener("dblclick", runAction(async () => {
+  settings = await api.updateSettings({ accountListPanePercent: 46 });
+  syncSettingsControls();
+}));
 
 autoSwitchInput.addEventListener("change", runAction(async () => {
   settings = await api.updateSettings({ autoSwitchEnabled: autoSwitchInput.checked });
@@ -496,6 +511,8 @@ async function initialize() {
   applyTranslations();
   showView(currentView);
   await loadAccounts(t("status.ready"));
+  initializePaneObservers();
+  updatePaneDensity();
   startBackgroundRefreshTimer();
 }
 
@@ -513,6 +530,7 @@ function syncSettingsControls() {
   settingsRequireSwitchConfirmation.checked = settings.requireSwitchConfirmation !== false;
   settingsHttpOnly.checked = Boolean(settings.httpOnlyModeEnabled);
   settingsLanguage.value = settings.uiLanguage === "en" ? "en" : "zh-CN";
+  applyAccountPaneWidth(settings.accountListPanePercent);
   for (const input of settingsThemeInputs) {
     input.checked = input.value === normalizeThemeMode(settings.themeMode);
   }
@@ -560,6 +578,78 @@ function applyTheme() {
 
 function normalizeThemeMode(value) {
   return value === "light" || value === "dark" ? value : "system";
+}
+
+function applyAccountPaneWidth(value) {
+  accountsWorkspace.style.setProperty("--account-list-pane", `${clampAccountPanePercent(value)}%`);
+  requestAnimationFrame(updatePaneDensity);
+}
+
+function clampAccountPanePercent(value) {
+  const percent = Number(value);
+  return Number.isFinite(percent) ? Math.round(Math.max(28, Math.min(68, percent))) : 46;
+}
+
+function panePercentFromPointer(clientX) {
+  const rect = accountsWorkspace.getBoundingClientRect();
+  const splitterWidth = accountsSplitter.getBoundingClientRect().width || 12;
+  const minimumListWidth = 320;
+  const minimumDetailWidth = 360;
+  const available = Math.max(1, rect.width - splitterWidth);
+  const rawListWidth = clientX - rect.left - splitterWidth / 2;
+  const listWidth = Math.max(minimumListWidth, Math.min(available - minimumDetailWidth, rawListWidth));
+  return clampAccountPanePercent((listWidth / available) * 100);
+}
+
+function startPaneResize(event) {
+  if (event.button !== 0 || window.matchMedia("(max-width: 980px)").matches) {
+    return;
+  }
+
+  event.preventDefault();
+  accountsSplitter.setPointerCapture(event.pointerId);
+  document.body.classList.add("resizing-panes");
+  let nextPercent = clampAccountPanePercent(settings.accountListPanePercent);
+
+  const onPointerMove = (moveEvent) => {
+    nextPercent = panePercentFromPointer(moveEvent.clientX);
+    applyAccountPaneWidth(nextPercent);
+  };
+
+  const onPointerUp = async () => {
+    accountsSplitter.removeEventListener("pointermove", onPointerMove);
+    accountsSplitter.removeEventListener("pointerup", onPointerUp);
+    accountsSplitter.removeEventListener("pointercancel", onPointerUp);
+    document.body.classList.remove("resizing-panes");
+    try {
+      settings = await api.updateSettings({ accountListPanePercent: nextPercent });
+      syncSettingsControls();
+    } catch (error) {
+      setStatus(errorMessage(error));
+    }
+  };
+
+  accountsSplitter.addEventListener("pointermove", onPointerMove);
+  accountsSplitter.addEventListener("pointerup", onPointerUp);
+  accountsSplitter.addEventListener("pointercancel", onPointerUp);
+}
+
+function initializePaneObservers() {
+  if (!("ResizeObserver" in window)) {
+    window.addEventListener("resize", updatePaneDensity);
+    return;
+  }
+  const observer = new ResizeObserver(updatePaneDensity);
+  observer.observe(listPanel);
+  observer.observe(detailEl);
+}
+
+function updatePaneDensity() {
+  const listWidth = listPanel.getBoundingClientRect().width;
+  const detailWidth = detailEl.getBoundingClientRect().width;
+  listPanel.classList.toggle("compact", listWidth < 430);
+  detailEl.classList.toggle("compact", detailWidth < 540);
+  detailEl.classList.toggle("narrow", detailWidth < 420);
 }
 
 function startBackgroundRefreshTimer() {
@@ -653,7 +743,12 @@ async function evaluateQuotaActions(reason) {
     }
     autoSwitchInProgress = true;
     try {
-      const result = await api.switchAccount(target.id);
+      const result = await api.switchAccount(target.id, { deferIfCodexRunning: true });
+      if (result.deferred) {
+        setStatus(t("status.autoSwitchDeferred", { count: result.runningCodexProcesses ?? 0 }));
+        renderQuotaWarning();
+        return;
+      }
       selectedAccountId = target.id;
       await loadAccounts(t("status.autoSwitched", { email: target.emailMasked, count: result.closedCodexProcesses ?? 0 }), { reason: "auto-switch" });
     } finally {
@@ -1054,6 +1149,12 @@ function translateTree(root) {
   }
   for (const node of root.querySelectorAll("[data-i18n-placeholder]")) {
     node.placeholder = t(node.dataset.i18nPlaceholder);
+  }
+  for (const node of root.querySelectorAll("[data-i18n-title]")) {
+    node.title = t(node.dataset.i18nTitle);
+  }
+  for (const node of root.querySelectorAll("[data-i18n-aria-label]")) {
+    node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
   }
 }
 

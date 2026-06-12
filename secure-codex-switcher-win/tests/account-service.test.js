@@ -95,6 +95,42 @@ test("switching to the current account does not restart Codex", { skip: process.
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(codexDir, "auth.json"), "utf8")), auth);
 });
 
+test("deferred auto switch does not close running Codex", { skip: process.platform !== "win32" }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  fs.mkdirSync(codexDir, { recursive: true });
+  const initialAuth = { access_token: "a", account_id: "acct-a" };
+  const currentAuth = { access_token: "current", account_id: "acct-current" };
+  fs.writeFileSync(path.join(codexDir, "auth.json"), JSON.stringify(initialAuth), "utf8");
+
+  let closedCodexProcesses = 0;
+  let launchedCodex = 0;
+  const service = createAccountService(userData, {
+    codexDir,
+    countCodexProcesses: () => 3,
+    closeCodexProcesses: () => {
+      closedCodexProcesses += 1;
+      return 3;
+    },
+    launchCodex: () => {
+      launchedCodex += 1;
+      return true;
+    }
+  });
+  const imported = service.importCurrentAuth();
+  fs.writeFileSync(path.join(codexDir, "auth.json"), JSON.stringify(currentAuth), "utf8");
+
+  const result = service.switchAccount(imported.id, { deferIfCodexRunning: true });
+
+  assert.equal(result.deferred, true);
+  assert.equal(result.deferReason, "codex_running");
+  assert.equal(result.runningCodexProcesses, 3);
+  assert.equal(closedCodexProcesses, 0);
+  assert.equal(launchedCodex, 0);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(codexDir, "auth.json"), "utf8")), currentAuth);
+});
+
 test("account switching still reopens Codex when HTTP-only config repair fails", { skip: process.platform !== "win32" }, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
   const userData = path.join(root, "appdata");
@@ -209,23 +245,27 @@ test("fills missing legacy settings with safe defaults", { skip: process.platfor
   assert.equal(settings.closeBehavior, "ask");
   assert.equal(settings.themeMode, "system");
   assert.equal(settings.httpOnlyModeEnabled, false);
+  assert.equal(settings.accountListPanePercent, 46);
   assert.equal(settings.usageRefreshIntervalMinutes, 5);
 
-  const updated = service.updateSettings({ uiLanguage: "en", closeBehavior: "minimize", themeMode: "dark", usageRefreshIntervalMinutes: 0 });
+  const updated = service.updateSettings({ uiLanguage: "en", closeBehavior: "minimize", themeMode: "dark", accountListPanePercent: 20, usageRefreshIntervalMinutes: 0 });
   assert.equal(updated.uiLanguage, "en");
   assert.equal(updated.closeBehavior, "minimize");
   assert.equal(updated.themeMode, "dark");
+  assert.equal(updated.accountListPanePercent, 28);
   assert.equal(updated.usageRefreshIntervalMinutes, 1);
   assert.equal(service.readSettings().uiLanguage, "en");
 
-  const clamped = service.updateSettings({ closeBehavior: "quit", themeMode: "light", usageRefreshIntervalMinutes: 99 });
+  const clamped = service.updateSettings({ closeBehavior: "quit", themeMode: "light", accountListPanePercent: 90, usageRefreshIntervalMinutes: 99 });
   assert.equal(clamped.closeBehavior, "quit");
   assert.equal(clamped.themeMode, "light");
+  assert.equal(clamped.accountListPanePercent, 68);
   assert.equal(clamped.usageRefreshIntervalMinutes, 60);
 
-  const unchanged = service.updateSettings({ closeBehavior: "invalid", themeMode: "invalid", usageRefreshIntervalMinutes: 10 });
+  const unchanged = service.updateSettings({ closeBehavior: "invalid", themeMode: "invalid", accountListPanePercent: 52, usageRefreshIntervalMinutes: 10 });
   assert.equal(unchanged.closeBehavior, "quit");
   assert.equal(unchanged.themeMode, "light");
+  assert.equal(unchanged.accountListPanePercent, 52);
   assert.equal(unchanged.usageRefreshIntervalMinutes, 10);
 });
 

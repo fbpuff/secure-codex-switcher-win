@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld("codexSwitcher", {
   importCurrentAuth: () => invoke("accounts:importCurrent"),
   refreshUsage: (accountId, force = false) => invoke("accounts:refreshUsage", accountId, force),
   refreshAllUsage: () => invoke("accounts:refreshAllUsage"),
-  switchAccount: (accountId) => invoke("accounts:switch", accountId),
+  switchAccount: (accountId, options) => invoke("accounts:switch", accountId, options),
   deleteAccount: (accountId, options) => invoke("accounts:delete", accountId, options),
   pickBestAccount: () => invoke("accounts:pickBest"),
   readSettings: () => invoke("settings:read"),
