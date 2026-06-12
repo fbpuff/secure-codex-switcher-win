@@ -109,6 +109,16 @@
               <div id="accounts" class="account-list"></div>
             </section>
 
+            <button
+              id="accounts-splitter"
+              class="splitter"
+              type="button"
+              aria-label="Resize account panels"
+              data-i18n-aria-label="splitter.resize"
+              title="拖动调整左右宽度，双击恢复默认"
+              data-i18n-title="splitter.resizeTitle"
+            ></button>
+
             <aside id="detail" class="detail-panel" aria-label="Account detail"></aside>
           </section>
         </section>
@@ -245,8 +255,10 @@
           <h3 data-field="email"></h3>
           <p data-field="meta"></p>
         </div>
-        <div data-field="five-ring" class="usage-cell quota-ring-card success"></div>
-        <div data-field="week-ring" class="usage-cell quota-ring-card info"></div>
+        <div class="account-usage-row">
+          <div data-field="five-ring" class="usage-cell quota-ring-card success"></div>
+          <div data-field="week-ring" class="usage-cell quota-ring-card info"></div>
+        </div>
         <p data-field="error" class="usage-error"></p>
         <div class="account-actions">
           <button data-action="switch" class="account-action-button" type="button" title="切换账号">

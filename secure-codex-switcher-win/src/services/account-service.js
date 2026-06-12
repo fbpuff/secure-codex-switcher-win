@@ -26,6 +26,7 @@ class AccountService {
     this.fetchImpl = options.fetchImpl;
     this.closeCodexProcesses = options.closeCodexProcesses ?? closeOfficialCodexProcesses;
     this.launchCodex = options.launchCodex ?? launchOfficialCodex;
+    this.countCodexProcesses = options.countCodexProcesses ?? countOfficialCodexProcesses;
     this.codexAuthPath = path.join(this.codexDir, "auth.json");
     this.codexConfigPath = path.join(this.codexDir, "config.toml");
     this.storePath = path.join(userDataPath, "accounts-store.json");
@@ -135,7 +136,7 @@ class AccountService {
     return results;
   }
 
-  switchAccount(accountId) {
+  switchAccount(accountId, options = {}) {
     this.syncCurrentAuth();
     const store = this.readStore();
     const account = this.findAccount(store, accountId);
@@ -149,6 +150,20 @@ class AccountService {
         launchedCodex: false,
         alreadyCurrent: true
       };
+    }
+    if (options.deferIfCodexRunning) {
+      const runningCodexProcesses = this.countCodexProcesses();
+      if (runningCodexProcesses > 0) {
+        return {
+          switchedTo: this.publicAccount(account, this.currentAuthFingerprint()),
+          authPath: this.codexAuthPath,
+          closedCodexProcesses: 0,
+          launchedCodex: false,
+          deferred: true,
+          deferReason: "codex_running",
+          runningCodexProcesses
+        };
+      }
     }
     const closedCodexProcesses = this.closeCodexProcesses();
     fs.mkdirSync(this.codexDir, { recursive: true });
@@ -295,6 +310,10 @@ class AccountService {
       closeBehavior: isCloseBehavior(patch?.closeBehavior) ? patch.closeBehavior : current.closeBehavior,
       themeMode: isThemeMode(patch?.themeMode) ? patch.themeMode : current.themeMode,
       httpOnlyModeEnabled: current.httpOnlyModeEnabled,
+      accountListPanePercent:
+        Number.isFinite(patch?.accountListPanePercent)
+          ? Math.round(Math.max(28, Math.min(68, Number(patch.accountListPanePercent))))
+          : current.accountListPanePercent,
       usageRefreshIntervalMinutes:
         Number.isFinite(patch?.usageRefreshIntervalMinutes)
           ? Math.round(Math.max(1, Math.min(60, Number(patch.usageRefreshIntervalMinutes))))
@@ -491,6 +510,9 @@ function normalizeSettings(value) {
     closeBehavior: isCloseBehavior(value?.closeBehavior) ? value.closeBehavior : "ask",
     themeMode: isThemeMode(value?.themeMode) ? value.themeMode : "system",
     httpOnlyModeEnabled: typeof value?.httpOnlyModeEnabled === "boolean" ? value.httpOnlyModeEnabled : false,
+    accountListPanePercent: Number.isFinite(Number(value?.accountListPanePercent))
+      ? Math.round(Math.max(28, Math.min(68, Number(value.accountListPanePercent))))
+      : 46,
     usageRefreshIntervalMinutes: Number.isFinite(refreshInterval) ? Math.round(Math.max(1, Math.min(60, refreshInterval))) : 5
   };
 }
@@ -574,6 +596,35 @@ Write-Output $count
     return Number.parseInt(output, 10) || 0;
   } catch {
     throw new Error("无法完全关闭官方 Codex，已取消本次切换或删除。请手动退出 Codex 后重试。");
+  }
+}
+
+function countOfficialCodexProcesses() {
+  if (process.platform !== "win32") {
+    return 0;
+  }
+  const script = `
+$currentPid = ${process.pid}
+$targets = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+  ($_.ProcessName -eq 'Codex' -or $_.ProcessName -eq 'codex') -and
+  $_.Id -ne $currentPid -and
+  $_.Path -and
+  (
+    $_.Path -like '*\\OpenAI.Codex_*' -or
+    $_.Path -like '*\\AppData\\Local\\OpenAI\\Codex\\*'
+  )
+})
+Write-Output $targets.Count
+`;
+  try {
+    const output = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 10_000
+    }).trim();
+    return Number.parseInt(output, 10) || 0;
+  } catch {
+    return 0;
   }
 }
 

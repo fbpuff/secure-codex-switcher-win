@@ -71,6 +71,7 @@ Refresh behavior:
 - While the GUI is open, it refreshes all accounts in the background. The interval defaults to 5 minutes and can be changed in `设置 / Settings`.
 - If `低余量提醒` is enabled, the app shows a red inline warning when the current account drops to 15% remaining or below.
 - If `用尽后自动切换` is enabled, the app switches directly to the best fresh non-current account only when the current account is exhausted. The 15% threshold is just a warning.
+- Automatic switching is conservative: if official Codex processes are still running, the Switcher defers the automatic account change and shows an inline warning instead of force-closing an active conversation.
 - Switching writes `%USERPROFILE%\.codex\auth.json`, closes official Codex processes, and then starts official Codex again so the new account is loaded.
 - When official Codex refreshes the current account's auth file, the Switcher automatically updates the matching encrypted account record.
 - Deleting a non-current account only removes the local encrypted Switcher record.
@@ -113,6 +114,8 @@ Current UI direction:
 - The left rail only keeps account navigation and settings navigation. The `.codex` folder opener lives inside `设置 / Settings -> 应用 / App`.
 - Low-quota warning and auto-switch controls are grouped vertically in one compact account-page control.
 - Color theme uses a three-option segmented control instead of a dropdown.
+- The account list and account detail panes can be resized with the center splitter. The ratio is saved locally as `accountListPanePercent` in `settings.json`, and double-clicking the splitter restores the default width.
+- Account cards and detail usage cards adapt to narrow pane widths. The usage rings keep a stable visual size, long account text is clipped or wrapped where appropriate, and the left rail keeps a dark hover/active state for readability.
 - Selecting an account updates only the row selection state and the detail panel, preserving the account list scroll position.
 
 Close behavior:
@@ -128,6 +131,7 @@ Relevant implementation paths:
 - Renderer IPC allowlist for quit: `src/preload.cjs`.
 - Settings UI and event handling: `src/renderer/index.html` and `src/renderer/app.js`.
 - Settings layout and theme styles: `src/renderer/styles.css`.
+- Account switching, auto-switch deferral, DPAPI auth storage, and settings normalization: `src/services/account-service.js`.
 
 ## Current scope
 
