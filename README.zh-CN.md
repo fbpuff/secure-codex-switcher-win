@@ -6,6 +6,13 @@
 
 这个项目适合已经使用官方 Codex 应用或 CLI 的用户。它不会提供或绕过 OpenAI 登录流程，登录仍然由官方 Codex 完成。
 
+## 版本
+
+- `v1.1`：账号列表和详情面板可调宽度，优化响应式账号卡片，补充 HTTP-only 模式文档，并改进自动切换延迟策略。
+- `v2.1`：排队式自动切换。Codex 正在运行时会排队目标账号，每 15 秒检查一次，等 Codex 退出后完成切换。
+- `v2.2`：基于对话活动的自动切换。只有检测到 Codex 对话或任务仍活跃时才等待；如果 Codex 打开但空闲，排队切换可以继续完成。
+- `v2.3.0`：新增独立本地 token 用量页面，支持选择统计日期、7 天每日用量横条图、7 天每日缓存命中率横条图、与账号余量一致的刷新节奏，以及中英文文档。
+
 ## 功能
 
 - Windows GUI：导入、查看、刷新、切换和删除本地 Codex 账号。
@@ -17,6 +24,9 @@
 - 支持新版 Codex `tokens` 嵌套 auth 结构。
 - GUI 打开时会定时刷新用量，并在接口允许时显示 5 小时 / 7 天窗口。
 - 支持低余量提醒；自动切换只会在当前账号用尽时触发。
+- 自动切换具备活动感知排队能力，不会在 Codex 对话或任务仍活跃时强行自动切换。
+- 提供独立 `用量 / Usage` 页面，从 Codex 本地 rollout 日志统计 token 总量和缓存命中率趋势。
+- 支持最小化到托盘和可配置关闭行为。
 - GUI 支持中文和英文，选择会保存到本地设置。
 
 ## 安全模型
@@ -143,6 +153,7 @@ GUI 会导入官方 Codex 的 auth 文件：
 - GUI 打开时，每 5 分钟后台刷新一次。
 - 低余量提醒默认在剩余 15% 或以下时显示。
 - 自动切换只在当前账号用尽时触发。
+- 本地 token 用量统计与账号余量刷新使用相同后台间隔。
 
 常见失败：
 
@@ -151,6 +162,37 @@ GUI 会导入官方 Codex 的 auth 文件：
 - 网络超时：先启动代理/VPN，再刷新。
 
 启动脚本会读取 `HTTP_PROXY`、`HTTPS_PROXY` 和 Windows 当前用户代理设置。
+
+## 本地 token 用量页面
+
+左侧导航栏中有独立的 `用量 / Usage` 页面，位置在 `设置 / Settings` 上方。
+
+用量页面包括：
+
+- `选中日`、`近 7 天`、`本月` token 总量。
+- `平均缓存命中率`，口径为选中 7 天窗口内 `cached_input_tokens / input_tokens`。
+- 统计日期选择器。选择某一天后，会显示该日和前 6 个自然日，共 7 天。
+- 左侧横条图显示选中 7 天窗口内每天的 token 总量，最高日为 100%，其他日期等比例缩放。
+- 右侧横条图显示同一个 7 天窗口内每天的缓存命中率，按 0-100% 缩放。
+
+数据来源：
+
+- `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`
+- `%USERPROFILE%\.codex\archived_sessions\**\rollout-*.jsonl`
+
+解析器只读取：
+
+- `timestamp`
+- `payload.info.last_token_usage`
+
+不会显示对话正文。
+
+准确性边界：
+
+- 对本机 rollout 日志中存在 `last_token_usage` 的记录，统计是真实汇总，不是估算。
+- 这不是 OpenAI 官方账单，不包含其他设备使用量。
+- 如果 Codex 日志被删除、移动到其他位置，或由未写入 `last_token_usage` 的旧版本生成，对应 token 无法统计。
+- 当前不能稳定按账号拆分，因为 Codex rollout usage 事件没有稳定账号 ID。
 
 ## HTTP-only 模式
 
@@ -185,14 +227,14 @@ GUI 会导入官方 Codex 的 auth 文件：
 - 当前账号用尽后的自动切换。
 - 手动切换前确认。
 - 适用于 WebSocket 代理不稳定环境的 HTTP-only 传输。
-- 窗口关闭行为。
+- 窗口关闭行为：每次询问、最小化到任务栏、最小化到托盘、退出应用。
 - 打开 `%USERPROFILE%\.codex` 文件夹。
 - 彻底退出 Switcher 应用。
 
 当前界面调整方向：
 
 - 账号管理和设置页拆成独立视图，避免账号搜索框、账号列表遮挡设置内容。
-- 左侧栏只保留账号和设置两个导航入口；`.codex` 文件夹入口移动到 `设置 -> 应用`。
+- 左侧栏保留账号、用量和设置入口；`.codex` 文件夹入口移动到 `设置 -> 应用`。
 - `低余量提醒` 和 `用尽后自动切换` 在账号页中改成上下排列的组合控件。
 - 颜色主题改成三段按钮，不再使用下拉框。
 - 点击选择账号时只更新选中态和右侧详情，不再重建左侧账号列表，因此列表滚动位置不会跳回顶部。
@@ -201,7 +243,9 @@ GUI 会导入官方 Codex 的 auth 文件：
 
 - 首次关闭窗口时，应用会询问最小化还是退出；如果勾选“以后均保持此操作”，选择会保存到本地 `settings.json`。
 - 如果关闭行为设置为“最小化窗口”，点击窗口关闭按钮会最小化。
+- 如果关闭行为设置为“最小化到托盘”，点击窗口关闭按钮会从任务栏隐藏并保留托盘图标。点击或双击托盘图标可恢复窗口。
 - 最小化后想彻底退出，可以进入 `设置 -> 应用 -> 退出应用`，也可以在任务栏右键窗口并选择 `关闭窗口`。
+- 最小化到托盘后想彻底退出，可以使用托盘菜单 `退出应用`，或进入设置页点击 `退出应用`。
 - `settings.json` 只保存行为配置，不保存账号 token 或 API key。
 
 相关实现路径：
@@ -209,7 +253,7 @@ GUI 会导入官方 Codex 的 auth 文件：
 - 主进程关闭/退出逻辑：`secure-codex-switcher-win/src/main.js`。
 - Renderer 退出 IPC allowlist：`secure-codex-switcher-win/src/preload.cjs`。
 - 设置页结构和事件：`secure-codex-switcher-win/src/renderer/index.html`、`secure-codex-switcher-win/src/renderer/app.js`。
-- 设置页布局和主题样式：`secure-codex-switcher-win/src/renderer/styles.css`。
+- 设置、用量图表和主题样式：`secure-codex-switcher-win/src/renderer/styles.css`。
 - HTTP-only 配置管理：`secure-codex-switcher-win/src/core/codex-config.js`。
 - 历史 provider 迁移：`secure-codex-switcher-win/src/core/codex-history.js`。
 
