@@ -6,6 +6,13 @@ A local-only Windows GUI for managing multiple official Codex / ChatGPT auth fil
 
 This project is designed for users who already use the official Codex app or CLI and want a safer local account switcher. It does not provide or bypass OpenAI login. Login still happens through official Codex.
 
+## Versions
+
+- `v1.1`: resizable account/detail panes, polished responsive account cards, HTTP-only mode documentation, and safer auto-switch deferral.
+- `v2.1`: queued auto-switch. When Codex is running, the Switcher queues the target account, checks every 15 seconds, and completes the switch after Codex exits.
+- `v2.2`: activity-aware auto-switch. The Switcher waits only when a Codex conversation or task appears active; if Codex is open but idle, the queued switch can complete.
+- `v2.3.0`: dedicated local token-usage dashboard with selected-date 7-day charts, daily cache-hit bars, synchronized refresh cadence, and bilingual documentation.
+
 ## Features
 
 - Windows GUI for importing, viewing, refreshing, switching, and deleting local Codex accounts.
@@ -17,6 +24,9 @@ This project is designed for users who already use the official Codex app or CLI
 - Supports current nested Codex auth format under `tokens`.
 - Refreshes usage while the GUI is open and shows 5-hour / 7-day quota windows when the upstream endpoint allows it.
 - Shows low-quota warnings and can switch automatically only when the current account is exhausted.
+- Uses activity-aware queued auto-switching so active Codex conversations are not interrupted by automatic account changes.
+- Provides a dedicated `Usage / 用量` dashboard for local token totals and cache-hit trends from Codex rollout logs.
+- Supports minimize-to-tray and configurable close behavior.
 
 ## Security Model
 
@@ -144,6 +154,7 @@ Refresh behavior:
 - While the GUI is open, all accounts refresh every 5 minutes.
 - Low-quota warning appears at 15% remaining or below.
 - Auto-switch only triggers when the current account is exhausted.
+- Local token usage stats refresh on the same interval as account usage refresh while the GUI is open.
 
 Common failures:
 
@@ -152,6 +163,37 @@ Common failures:
 - Network timeout: start your proxy/VPN, then refresh again.
 
 The launcher reads `HTTP_PROXY`, `HTTPS_PROXY`, and Windows user proxy settings.
+
+## Local Token Usage Dashboard
+
+The left rail includes a dedicated `Usage / 用量` page above `Settings / 设置`.
+
+The dashboard shows:
+
+- `Selected Day`, `Last 7 Days`, and `This Month` local token totals.
+- Average cache-hit rate for the selected 7-day window, calculated as `cached_input_tokens / input_tokens`.
+- A stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
+- Daily token usage bars for the selected 7-day window. The highest day is 100%, and other days scale proportionally.
+- Daily cache-hit-rate bars for the same selected 7-day window.
+
+Data source:
+
+- `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`
+- `%USERPROFILE%\.codex\archived_sessions\**\rollout-*.jsonl`
+
+The parser reads only:
+
+- `timestamp`
+- `payload.info.last_token_usage`
+
+It does not display conversation text.
+
+Accuracy boundary:
+
+- These stats are real summaries of local Codex rollout records that contain `last_token_usage`.
+- They are not OpenAI billing data.
+- They do not include usage from other devices or deleted logs.
+- They are not split by account because current Codex rollout usage events do not expose a stable account ID.
 
 ## HTTP-only Mode
 
@@ -186,7 +228,7 @@ Open `设置 / Settings` from the left rail to change:
 - Auto-switch when the current account is exhausted.
 - Manual switch confirmation.
 - HTTP-only transport for unstable WebSocket proxy environments.
-- Window close behavior.
+- Window close behavior: ask every time, minimize to taskbar, minimize to tray, or quit.
 - Open the `%USERPROFILE%\.codex` folder.
 - Fully quit the Switcher app.
 
@@ -194,6 +236,7 @@ Current UI direction:
 
 - Account management and settings are separate views, so the account search/list UI does not overlap the settings page.
 - The left rail only keeps account navigation and settings navigation. The `.codex` folder opener lives inside `设置 / Settings -> 应用 / App`.
+- The left rail includes a separate `Usage / 用量` page for token charts, placed above settings.
 - Low-quota warning and auto-switch controls are grouped vertically in one compact account-page control.
 - Color theme uses a three-option segmented control instead of a dropdown.
 - Selecting an account now updates only the selected row state and the detail panel, so the left account list keeps its scroll position instead of jumping back to the top.
@@ -202,7 +245,9 @@ Close behavior:
 
 - On first close, the app asks whether to minimize or quit. If you choose `Always use this action`, the choice is saved locally in `settings.json`.
 - If close behavior is set to `Minimize window`, clicking the window close button minimizes the app.
+- If close behavior is set to `Minimize to tray`, clicking the window close button hides the app from the taskbar and keeps a tray icon. Click or double-click the tray icon to restore the window.
 - To fully quit after minimizing, either use `设置 / Settings -> 应用 / App -> 退出应用 / Quit App`, or right-click the minimized taskbar window and choose `关闭窗口 / Close window`.
+- To fully quit after minimizing to tray, use the tray menu `退出应用 / Quit App` or the Settings page quit button.
 - No account tokens or API keys are stored in settings.
 
 Relevant implementation paths:
@@ -210,7 +255,7 @@ Relevant implementation paths:
 - Main close/quit behavior: `secure-codex-switcher-win/src/main.js`.
 - Renderer IPC allowlist for quit: `secure-codex-switcher-win/src/preload.cjs`.
 - Settings UI and event handling: `secure-codex-switcher-win/src/renderer/index.html` and `secure-codex-switcher-win/src/renderer/app.js`.
-- Settings layout and theme styles: `secure-codex-switcher-win/src/renderer/styles.css`.
+- Settings, usage charts, and theme styles: `secure-codex-switcher-win/src/renderer/styles.css`.
 - HTTP-only config management: `secure-codex-switcher-win/src/core/codex-config.js`.
 - History provider migration: `secure-codex-switcher-win/src/core/codex-history.js`.
 
