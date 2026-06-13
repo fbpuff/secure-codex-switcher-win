@@ -27,6 +27,9 @@ class AccountService {
     this.closeCodexProcesses = options.closeCodexProcesses ?? closeOfficialCodexProcesses;
     this.launchCodex = options.launchCodex ?? launchOfficialCodex;
     this.countCodexProcesses = options.countCodexProcesses ?? countOfficialCodexProcesses;
+    this.isProcessAlive = options.isProcessAlive ?? isProcessAlive;
+    this.nowMs = options.nowMs ?? (() => Date.now());
+    this.activityWindowMs = options.activityWindowMs ?? 30_000;
     this.codexAuthPath = path.join(this.codexDir, "auth.json");
     this.codexConfigPath = path.join(this.codexDir, "config.toml");
     this.storePath = path.join(userDataPath, "accounts-store.json");
@@ -253,6 +256,22 @@ class AccountService {
 
   countOfficialCodexProcesses() {
     return this.countCodexProcesses();
+  }
+
+  getCodexActivityStatus() {
+    return getCodexActivityStatus({
+      codexDir: this.codexDir,
+      isProcessAlive: this.isProcessAlive,
+      nowMs: this.nowMs(),
+      activityWindowMs: this.activityWindowMs
+    });
+  }
+
+  getTokenUsageStats(options = {}) {
+    return getTokenUsageStats({
+      codexDir: this.codexDir,
+      nowMs: selectedStatsNowMs(options?.asOfDate, this.nowMs())
+    });
   }
 
   syncCurrentAuth() {
@@ -522,11 +541,29 @@ function normalizeSettings(value) {
 }
 
 function isCloseBehavior(value) {
-  return value === "ask" || value === "minimize" || value === "quit";
+  return value === "ask" || value === "minimize" || value === "tray" || value === "quit";
 }
 
 function isThemeMode(value) {
   return value === "system" || value === "light" || value === "dark";
+}
+
+function selectedStatsNowMs(asOfDate, currentNowMs) {
+  if (typeof asOfDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
+    return currentNowMs;
+  }
+  const [year, month, day] = asOfDate.split("-").map(Number);
+  const selectedStart = new Date(year, month - 1, day).getTime();
+  if (!Number.isFinite(selectedStart)) {
+    return currentNowMs;
+  }
+  const selectedEnd = selectedStart + 24 * 60 * 60 * 1000 - 1;
+  const currentDate = new Date(currentNowMs);
+  const currentStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()).getTime();
+  if (selectedStart >= currentStart) {
+    return currentNowMs;
+  }
+  return selectedEnd;
 }
 
 function normalizeDeleteOptions(value) {
@@ -629,6 +666,268 @@ Write-Output $targets.Count
     return Number.parseInt(output, 10) || 0;
   } catch {
     return 0;
+  }
+}
+
+function getCodexActivityStatus({ codexDir, isProcessAlive: processAlive, nowMs, activityWindowMs }) {
+  const activeProcessCount = countActiveChatProcesses(codexDir, processAlive);
+  if (activeProcessCount > 0) {
+    return {
+      isBusy: true,
+      reason: "active_chat_process",
+      activeProcessCount,
+      lastActivityAt: undefined
+    };
+  }
+
+  const latestActivity = latestCodexActivity(codexDir);
+  if (latestActivity && nowMs - latestActivity.mtimeMs <= activityWindowMs) {
+    return {
+      isBusy: true,
+      reason: "recent_session_activity",
+      activeProcessCount: 0,
+      lastActivityAt: latestActivity.mtimeMs,
+      activitySnapshot: latestActivity
+    };
+  }
+
+  return {
+    isBusy: false,
+    reason: "idle",
+    activeProcessCount: 0,
+    lastActivityAt: latestActivity?.mtimeMs,
+    activitySnapshot: latestActivity
+  };
+}
+
+function countActiveChatProcesses(codexDir, processAlive) {
+  const chatProcessesPath = path.join(codexDir, "process_manager", "chat_processes.json");
+  if (!fs.existsSync(chatProcessesPath)) {
+    return 0;
+  }
+
+  try {
+    const value = JSON.parse(fs.readFileSync(chatProcessesPath, "utf8"));
+    const items = Array.isArray(value) ? value : Object.values(value ?? {});
+    const pids = new Set();
+    for (const item of items) {
+      const pid = Number(item?.osPid);
+      if (Number.isInteger(pid) && pid > 0) {
+        pids.add(pid);
+      }
+    }
+    let count = 0;
+    for (const pid of pids) {
+      if (processAlive(pid)) {
+        count += 1;
+      }
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+function latestCodexActivity(codexDir) {
+  const candidates = [
+    ...latestMatchingFiles(path.join(codexDir, "sessions"), /^rollout-.*\.jsonl$/)
+  ];
+  return candidates.sort((left, right) => right.mtimeMs - left.mtimeMs)[0];
+}
+
+function getTokenUsageStats({ codexDir, nowMs }) {
+  const now = new Date(nowMs);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const sevenDaysStart = todayStart - 6 * 24 * 60 * 60 * 1000;
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const totals = {
+    today: emptyTokenBucket(),
+    sevenDays: emptyTokenBucket(),
+    month: emptyTokenBucket()
+  };
+  const dailySevenDays = createDailyTokenBuckets(sevenDaysStart, 7);
+  let latestAt;
+  let scannedEvents = 0;
+  let countedEvents = 0;
+
+  for (const file of rolloutFiles(codexDir)) {
+    let lines;
+    try {
+      lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+    } catch {
+      continue;
+    }
+
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+      let event;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      scannedEvents += 1;
+      const usage = normalizeTokenUsage(event?.payload?.info?.last_token_usage);
+      if (!usage) {
+        continue;
+      }
+      const eventTime = parseEventTimestamp(event.timestamp);
+      if (!Number.isFinite(eventTime)) {
+        continue;
+      }
+
+      countedEvents += 1;
+      latestAt = latestAt === undefined ? eventTime : Math.max(latestAt, eventTime);
+      if (eventTime >= todayStart && eventTime <= nowMs) {
+        addTokenUsage(totals.today, usage);
+      }
+      if (eventTime >= sevenDaysStart && eventTime <= nowMs) {
+        addTokenUsage(totals.sevenDays, usage);
+        const daily = dailySevenDays.find((item) => eventTime >= item.startMs && eventTime < item.endMs);
+        if (daily) {
+          addTokenUsage(daily, usage);
+        }
+      }
+      if (eventTime >= monthStart && eventTime <= nowMs) {
+        addTokenUsage(totals.month, usage);
+      }
+    }
+  }
+
+  return {
+    source: "local_rollout_last_token_usage",
+    generatedAt: Math.floor(nowMs / 1000),
+    latestAt: latestAt ? Math.floor(latestAt / 1000) : undefined,
+    scannedEvents,
+    countedEvents,
+    dailySevenDays: dailySevenDays.map(({ startMs, endMs, ...bucket }) => bucket),
+    totals
+  };
+}
+
+function createDailyTokenBuckets(startMs, count) {
+  return Array.from({ length: count }, (_item, index) => {
+    const start = startMs + index * 24 * 60 * 60 * 1000;
+    const date = new Date(start);
+    return {
+      ...emptyTokenBucket(),
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+      startMs: start,
+      endMs: start + 24 * 60 * 60 * 1000
+    };
+  });
+}
+
+function rolloutFiles(codexDir) {
+  return [
+    ...latestMatchingFiles(path.join(codexDir, "sessions"), /^rollout-.*\.jsonl$/),
+    ...latestMatchingFiles(path.join(codexDir, "archived_sessions"), /^rollout-.*\.jsonl$/)
+  ].map((item) => item.path);
+}
+
+function emptyTokenBucket() {
+  return {
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    reasoningOutputTokens: 0,
+    totalTokens: 0,
+    events: 0
+  };
+}
+
+function normalizeTokenUsage(value) {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const totalTokens = nonNegativeNumber(value.total_tokens);
+  const inputTokens = nonNegativeNumber(value.input_tokens);
+  const cachedInputTokens = nonNegativeNumber(value.cached_input_tokens);
+  const outputTokens = nonNegativeNumber(value.output_tokens);
+  const reasoningOutputTokens = nonNegativeNumber(value.reasoning_output_tokens);
+  if ([totalTokens, inputTokens, cachedInputTokens, outputTokens, reasoningOutputTokens].every((item) => item === 0)) {
+    return undefined;
+  }
+  return {
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningOutputTokens,
+    totalTokens: totalTokens || inputTokens + outputTokens,
+    events: 1
+  };
+}
+
+function nonNegativeNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function addTokenUsage(target, usage) {
+  target.inputTokens += usage.inputTokens;
+  target.cachedInputTokens += usage.cachedInputTokens;
+  target.outputTokens += usage.outputTokens;
+  target.reasoningOutputTokens += usage.reasoningOutputTokens;
+  target.totalTokens += usage.totalTokens;
+  target.events += usage.events;
+}
+
+function parseEventTimestamp(value) {
+  if (typeof value === "number") {
+    return value > 10_000_000_000 ? value : value * 1000;
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function latestMatchingFiles(rootDir, namePattern, options = {}) {
+  if (!fs.existsSync(rootDir)) {
+    return [];
+  }
+
+  const recursive = options.recursive !== false;
+  const results = [];
+  const stack = [rootDir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (recursive) {
+          stack.push(fullPath);
+        }
+        continue;
+      }
+      if (!entry.isFile() || !namePattern.test(entry.name)) {
+        continue;
+      }
+      try {
+        const stat = fs.statSync(fullPath);
+        results.push({ path: fullPath, mtimeMs: stat.mtimeMs, size: stat.size });
+      } catch {}
+    }
+  }
+  return results;
+}
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
   }
 }
 

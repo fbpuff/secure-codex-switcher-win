@@ -147,6 +147,203 @@ test("counts official Codex processes without closing them", { skip: process.pla
   assert.equal(closedCodexProcesses, 0);
 });
 
+test("detects active Codex chat processes", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  const processDir = path.join(codexDir, "process_manager");
+  fs.mkdirSync(processDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(processDir, "chat_processes.json"),
+    JSON.stringify([
+      { osPid: 111, conversationId: "busy" },
+      { osPid: 222, conversationId: "done" }
+    ]),
+    "utf8"
+  );
+  const service = createAccountService(userData, {
+    codexDir,
+    isProcessAlive: (pid) => pid === 111,
+    nowMs: () => 1_000_000
+  });
+
+  const status = service.getCodexActivityStatus();
+
+  assert.equal(status.isBusy, true);
+  assert.equal(status.reason, "active_chat_process");
+  assert.equal(status.activeProcessCount, 1);
+});
+
+test("detects recent Codex session activity", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  const sessionDir = path.join(codexDir, "sessions", "2026", "06", "13");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  const rolloutPath = path.join(sessionDir, "rollout-test.jsonl");
+  fs.writeFileSync(rolloutPath, "{}", "utf8");
+  fs.utimesSync(rolloutPath, new Date(990_000), new Date(990_000));
+  const service = createAccountService(userData, {
+    codexDir,
+    isProcessAlive: () => false,
+    nowMs: () => 1_000_000,
+    activityWindowMs: 30_000
+  });
+
+  const status = service.getCodexActivityStatus();
+
+  assert.equal(status.isBusy, true);
+  assert.equal(status.reason, "recent_session_activity");
+  assert.equal(status.activeProcessCount, 0);
+  assert.ok(status.lastActivityAt >= 990_000);
+  assert.equal(status.activitySnapshot.size, 2);
+  assert.equal(status.activitySnapshot.path, rolloutPath);
+});
+
+test("treats stale Codex activity as idle", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  const processDir = path.join(codexDir, "process_manager");
+  const sessionDir = path.join(codexDir, "sessions", "2026", "06", "13");
+  fs.mkdirSync(processDir, { recursive: true });
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(path.join(processDir, "chat_processes.json"), JSON.stringify([{ osPid: 111 }]), "utf8");
+  const rolloutPath = path.join(sessionDir, "rollout-test.jsonl");
+  fs.writeFileSync(rolloutPath, "{}", "utf8");
+  fs.utimesSync(rolloutPath, new Date(900_000), new Date(900_000));
+  const service = createAccountService(userData, {
+    codexDir,
+    isProcessAlive: () => false,
+    nowMs: () => 1_000_000,
+    activityWindowMs: 30_000
+  });
+
+  const status = service.getCodexActivityStatus();
+
+  assert.equal(status.isBusy, false);
+  assert.equal(status.reason, "idle");
+  assert.equal(status.activeProcessCount, 0);
+  assert.equal(status.activitySnapshot.size, 2);
+});
+
+test("summarizes local rollout token usage by day week and month", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  const sessionDir = path.join(codexDir, "sessions", "2026", "06", "13");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  const rolloutPath = path.join(sessionDir, "rollout-test.jsonl");
+  const lines = [
+    {
+      timestamp: "2026-06-13T01:00:00.000Z",
+      payload: {
+        info: {
+          last_token_usage: {
+            input_tokens: 100,
+            cached_input_tokens: 40,
+            output_tokens: 20,
+            reasoning_output_tokens: 5,
+            total_tokens: 120
+          }
+        }
+      }
+    },
+    {
+      timestamp: "2026-06-10T01:00:00.000Z",
+      payload: {
+        info: {
+          last_token_usage: {
+            input_tokens: 10,
+            output_tokens: 4,
+            total_tokens: 14
+          }
+        }
+      }
+    },
+    {
+      timestamp: "2026-05-31T01:00:00.000Z",
+      payload: {
+        info: {
+          last_token_usage: {
+            input_tokens: 1000,
+            output_tokens: 100,
+            total_tokens: 1100
+          }
+        }
+      }
+    }
+  ];
+  fs.writeFileSync(rolloutPath, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`, "utf8");
+  const service = createAccountService(userData, {
+    codexDir,
+    nowMs: () => Date.parse("2026-06-13T12:00:00.000Z")
+  });
+
+  const stats = service.getTokenUsageStats();
+
+  assert.equal(stats.source, "local_rollout_last_token_usage");
+  assert.equal(stats.countedEvents, 3);
+  assert.equal(stats.totals.today.totalTokens, 120);
+  assert.equal(stats.totals.today.inputTokens, 100);
+  assert.equal(stats.totals.today.outputTokens, 20);
+  assert.equal(stats.totals.today.reasoningOutputTokens, 5);
+  assert.equal(stats.totals.sevenDays.totalTokens, 134);
+  assert.equal(stats.totals.month.totalTokens, 134);
+  assert.deepEqual(stats.dailySevenDays.map((day) => day.date), [
+    "2026-06-07",
+    "2026-06-08",
+    "2026-06-09",
+    "2026-06-10",
+    "2026-06-11",
+    "2026-06-12",
+    "2026-06-13"
+  ]);
+  assert.equal(stats.dailySevenDays[3].totalTokens, 14);
+  assert.equal(stats.dailySevenDays[6].totalTokens, 120);
+});
+
+test("summarizes local rollout token usage relative to a selected date", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  const sessionDir = path.join(codexDir, "sessions", "2026", "06", "13");
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(sessionDir, "rollout-test.jsonl"),
+    `${[
+      {
+        timestamp: "2026-06-10T01:00:00.000Z",
+        payload: { info: { last_token_usage: { input_tokens: 10, cached_input_tokens: 5, output_tokens: 2, total_tokens: 12 } } }
+      },
+      {
+        timestamp: "2026-06-13T01:00:00.000Z",
+        payload: { info: { last_token_usage: { input_tokens: 100, cached_input_tokens: 90, output_tokens: 20, total_tokens: 120 } } }
+      }
+    ].map((line) => JSON.stringify(line)).join("\n")}\n`,
+    "utf8"
+  );
+  const service = createAccountService(userData, {
+    codexDir,
+    nowMs: () => Date.parse("2026-06-13T12:00:00.000Z")
+  });
+
+  const stats = service.getTokenUsageStats({ asOfDate: "2026-06-10" });
+
+  assert.deepEqual(stats.dailySevenDays.map((day) => day.date), [
+    "2026-06-04",
+    "2026-06-05",
+    "2026-06-06",
+    "2026-06-07",
+    "2026-06-08",
+    "2026-06-09",
+    "2026-06-10"
+  ]);
+  assert.equal(stats.totals.today.totalTokens, 12);
+  assert.equal(stats.totals.sevenDays.totalTokens, 12);
+  assert.equal(stats.totals.month.totalTokens, 12);
+});
+
 test("account switching still reopens Codex when HTTP-only config repair fails", { skip: process.platform !== "win32" }, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "secure-codex-switcher-"));
   const userData = path.join(root, "appdata");
@@ -271,6 +468,12 @@ test("fills missing legacy settings with safe defaults", { skip: process.platfor
   assert.equal(updated.accountListPanePercent, 28);
   assert.equal(updated.usageRefreshIntervalMinutes, 1);
   assert.equal(service.readSettings().uiLanguage, "en");
+
+  const tray = service.updateSettings({ closeBehavior: "tray", themeMode: "light", accountListPanePercent: 90, usageRefreshIntervalMinutes: 99 });
+  assert.equal(tray.closeBehavior, "tray");
+  assert.equal(tray.themeMode, "light");
+  assert.equal(tray.accountListPanePercent, 68);
+  assert.equal(tray.usageRefreshIntervalMinutes, 60);
 
   const clamped = service.updateSettings({ closeBehavior: "quit", themeMode: "light", accountListPanePercent: 90, usageRefreshIntervalMinutes: 99 });
   assert.equal(clamped.closeBehavior, "quit");

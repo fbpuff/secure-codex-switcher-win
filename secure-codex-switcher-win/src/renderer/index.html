@@ -26,6 +26,10 @@
             <span class="nav-icon accounts-icon" aria-hidden="true"></span>
             <span data-i18n="nav.accounts">账号</span>
           </button>
+          <button id="usage-nav" class="nav-item" type="button">
+            <span class="nav-icon usage-icon" aria-hidden="true"></span>
+            <span data-i18n="nav.usage">用量</span>
+          </button>
           <button id="settings-nav" class="nav-item" type="button">
             <span class="nav-icon settings-icon" aria-hidden="true"></span>
             <span data-i18n="nav.settings">设置</span>
@@ -123,6 +127,60 @@
           </section>
         </section>
 
+        <section id="usage-view" class="usage-view" hidden>
+          <header class="usage-header">
+            <div>
+              <span class="eyebrow" data-i18n="usage.eyebrow">本地统计</span>
+              <h2 data-i18n="usage.title">Token 用量</h2>
+              <p data-i18n="usage.subtitle">基于本机 .codex 会话日志统计，不读取或显示对话正文。</p>
+            </div>
+            <button id="refresh-token-usage" type="button">
+              <span class="button-icon refresh-icon" aria-hidden="true"></span>
+              <span data-i18n="usage.refresh">刷新统计</span>
+            </button>
+          </header>
+
+          <section class="usage-summary-grid">
+            <article class="usage-summary-card">
+              <span data-i18n="usage.selectedDay">选中日</span>
+              <strong id="usage-total-today">0</strong>
+            </article>
+            <article class="usage-summary-card">
+              <span data-i18n="detail.tokenSevenDays">近 7 天</span>
+              <strong id="usage-total-seven-days">0</strong>
+            </article>
+            <article class="usage-summary-card">
+              <span data-i18n="detail.tokenMonth">本月</span>
+              <strong id="usage-total-month">0</strong>
+            </article>
+            <article class="usage-summary-card">
+              <span data-i18n="usage.averageCache">平均缓存命中率</span>
+              <strong id="usage-average-cache">0%</strong>
+            </article>
+          </section>
+
+          <section class="usage-chart-grid">
+            <article class="usage-chart-card">
+              <div class="chart-title-row">
+                <h3 data-i18n="usage.barTitle">周期总量</h3>
+                <span data-i18n="usage.barUnit">total tokens</span>
+              </div>
+              <div id="usage-bar-chart" class="usage-bar-chart" aria-label="Token totals by period"></div>
+              <label class="usage-date-picker">
+                <span data-i18n="usage.datePicker">统计日期</span>
+                <input id="usage-date" type="date" />
+              </label>
+            </article>
+            <article class="usage-chart-card">
+              <div class="chart-title-row">
+                <h3 data-i18n="usage.pieTitle">缓存命中率</h3>
+                <span data-i18n="usage.pieUnit">cached input / input</span>
+              </div>
+              <div id="usage-pie-chart" class="usage-hit-layout" aria-label="Token cache hit rate"></div>
+            </article>
+          </section>
+        </section>
+
         <section id="settings-view" class="settings-view" hidden>
           <header class="settings-header">
             <div>
@@ -168,6 +226,10 @@
                 <label>
                   <input name="settings-close-behavior" value="minimize" type="radio" />
                   <span data-i18n="settings.closeMinimize">最小化窗口</span>
+                </label>
+                <label>
+                  <input name="settings-close-behavior" value="tray" type="radio" />
+                  <span data-i18n="settings.closeTray">最小化到托盘</span>
                 </label>
                 <label>
                   <input name="settings-close-behavior" value="quit" type="radio" />
@@ -318,6 +380,7 @@
         </label>
         <div class="modal-actions">
           <button value="minimize" type="submit" data-i18n="close.minimize">最小化窗口</button>
+          <button value="tray" type="submit" data-i18n="close.tray">最小化到托盘</button>
           <button class="danger" value="quit" type="submit" data-i18n="close.quit">关闭应用</button>
         </div>
       </form>

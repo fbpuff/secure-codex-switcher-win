@@ -18,6 +18,7 @@ const replacementField = document.querySelector("#replacement-field");
 const replacementConfirm = document.querySelector("#replacement-confirm");
 const languageSelect = document.querySelector("#language-select");
 const accountsNav = document.querySelector("#accounts-nav");
+const usageNav = document.querySelector("#usage-nav");
 const settingsNav = document.querySelector("#settings-nav");
 const accountsView = document.querySelector("#accounts-view");
 const accountsTopbar = document.querySelector("#accounts-topbar");
@@ -25,6 +26,15 @@ const metricsStrip = document.querySelector("#metrics-strip");
 const accountsWorkspace = document.querySelector("#accounts-workspace");
 const listPanel = document.querySelector(".list-panel");
 const accountsSplitter = document.querySelector("#accounts-splitter");
+const usageView = document.querySelector("#usage-view");
+const refreshTokenUsageButton = document.querySelector("#refresh-token-usage");
+const usageTotalToday = document.querySelector("#usage-total-today");
+const usageTotalSevenDays = document.querySelector("#usage-total-seven-days");
+const usageTotalMonth = document.querySelector("#usage-total-month");
+const usageAverageCache = document.querySelector("#usage-average-cache");
+const usageBarChart = document.querySelector("#usage-bar-chart");
+const usagePieChart = document.querySelector("#usage-pie-chart");
+const usageDateInput = document.querySelector("#usage-date");
 const settingsView = document.querySelector("#settings-view");
 const settingsLanguage = document.querySelector("#settings-language");
 const settingsAutoSwitch = document.querySelector("#settings-auto-switch");
@@ -42,6 +52,7 @@ const messages = {
   "zh-CN": {
     "brand.subtitle": "Windows Local",
     "nav.accounts": "账号",
+    "nav.usage": "用量",
     "nav.settings": "设置",
     "rail.dpapi": "DPAPI protected",
     "top.eyebrow": "本机账号保险箱",
@@ -95,6 +106,7 @@ const messages = {
     "settings.closeBehavior": "关闭窗口行为",
     "settings.closeAsk": "每次询问",
     "settings.closeMinimize": "最小化窗口",
+    "settings.closeTray": "最小化到托盘",
     "settings.closeQuit": "关闭应用",
     "settings.appTitle": "应用",
     "settings.appHelp": "管理本地文件入口和应用退出。",
@@ -102,10 +114,30 @@ const messages = {
     "settings.codexTitle": ".codex 文件夹",
     "settings.codexHelp": "打开官方 Codex auth.json 所在目录。",
     "settings.openCodexFolder": "打开 .codex",
+    "usage.eyebrow": "本地统计",
+    "usage.title": "Token 用量",
+    "usage.subtitle": "基于本机 .codex 会话日志统计，不读取或显示对话正文。",
+    "usage.refresh": "刷新统计",
+    "usage.averageCache": "平均缓存命中率",
+    "usage.selectedDay": "选中日",
+    "usage.datePicker": "统计日期",
+    "usage.barTitle": "近 7 天每日用量",
+    "usage.barUnit": "total tokens",
+    "usage.pieTitle": "近 7 天缓存命中率",
+    "usage.pieUnit": "cached input / input",
+    "usage.noData": "暂无 token 记录",
+    "usage.maxDay": "最高",
+    "usage.minDay": "最低",
+    "usage.cacheToday": "今日命中",
+    "usage.cacheSevenDays": "近 7 天命中",
+    "usage.cacheMonth": "本月命中",
+    "usage.cachedInput": "缓存输入",
+    "usage.totalInput": "总输入",
     "close.title": "关闭 Codex Switcher？",
-    "close.intro": "选择最小化到任务栏，或直接关闭应用。",
+    "close.intro": "选择最小化到任务栏、最小化到托盘，或直接关闭应用。",
     "close.remember": "以后均保持此操作",
     "close.minimize": "最小化窗口",
+    "close.tray": "最小化到托盘",
     "close.quit": "关闭应用",
     "status.ready": "准备就绪",
     "status.processing": "处理中...",
@@ -131,7 +163,7 @@ const messages = {
     "status.backgroundFailed": "后台余量刷新失败：{error}",
     "status.exhaustedNoTarget": "当前账号已用尽，但没有可切换账号",
     "status.autoSwitched": "当前账号已用尽，已自动切换到 {email}，并关闭 {count} 个 Codex 进程。",
-    "status.autoSwitchQueued": "当前账号已用尽，已排队切换到 {email}。检测到 {count} 个 Codex 进程，关闭 Codex 后将自动切换并重新打开。",
+    "status.autoSwitchQueued": "当前账号已用尽，已排队切换到 {email}。检测到正在运行的 Codex 对话/任务，完成后将自动切换并重新打开。",
     "status.autoSwitchQueueCleared": "当前账号余量已恢复，已取消排队切换。",
     "status.accountUsageRefreshed": "账号余量已刷新",
     "status.switched": "账号已切换到 {email}",
@@ -145,7 +177,7 @@ const messages = {
     "status.loginNew": "当前账号已删除，并关闭 {count} 个 Codex 进程。{launch}请在官方 Codex 完成新账号登录，然后回到这里点击“导入/新增当前”。",
     "status.refreshFailures": "{message}，{count} 个账号刷新失败",
     "quota.empty": "当前账号余量已用尽，建议切换账号；如果已开启自动切换，应用会选择可用账号。",
-    "quota.pendingSwitch": "当前账号已用尽，已排队切换到 {email}。检测到 {count} 个 Codex 进程，关闭 Codex 后将自动切换并重新打开。",
+    "quota.pendingSwitch": "当前账号已用尽，已排队切换到 {email}。检测到正在运行的 Codex 对话/任务，完成后将自动切换并重新打开。",
     "quota.low": "当前账号余量只剩 {remaining}%，建议切换账号。",
     "empty.noAccounts": "还没有账号",
     "empty.noMatches": "没有匹配账号",
@@ -155,6 +187,16 @@ const messages = {
     "detail.selectHelp": "账号详情、余量窗口和切换操作会显示在这里。",
     "detail.fingerprint": "账号指纹 {id}",
     "detail.usage": "余量",
+    "detail.tokenUsage": "本地 token 用量",
+    "detail.tokenUsageHelp": "基于本机 .codex 会话日志统计，不读取或显示对话正文。",
+    "detail.tokenToday": "今日",
+    "detail.tokenSevenDays": "近 7 天",
+    "detail.tokenMonth": "本月",
+    "detail.tokenInput": "输入",
+    "detail.tokenOutput": "输出",
+    "detail.tokenReasoning": "推理",
+    "detail.tokenEvents": "{count} 次记录",
+    "detail.tokenLatest": "最近记录：{value}",
     "detail.fiveHour": "5 小时窗口",
     "detail.oneWeek": "7 天窗口",
     "detail.used": "已用 {used}",
@@ -185,6 +227,7 @@ const messages = {
   en: {
     "brand.subtitle": "Windows Local",
     "nav.accounts": "Accounts",
+    "nav.usage": "Usage",
     "nav.settings": "Settings",
     "rail.dpapi": "DPAPI protected",
     "top.eyebrow": "Local account vault",
@@ -238,6 +281,7 @@ const messages = {
     "settings.closeBehavior": "Window close behavior",
     "settings.closeAsk": "Ask every time",
     "settings.closeMinimize": "Minimize window",
+    "settings.closeTray": "Minimize to tray",
     "settings.closeQuit": "Quit app",
     "settings.appTitle": "App",
     "settings.appHelp": "Manage local file access and app exit.",
@@ -245,10 +289,30 @@ const messages = {
     "settings.codexTitle": ".codex Folder",
     "settings.codexHelp": "Open the folder where official Codex stores auth.json.",
     "settings.openCodexFolder": "Open .codex",
+    "usage.eyebrow": "Local stats",
+    "usage.title": "Token Usage",
+    "usage.subtitle": "Calculated from local .codex session logs. Conversation text is not read or displayed.",
+    "usage.refresh": "Refresh Stats",
+    "usage.averageCache": "Average Cache Hit",
+    "usage.selectedDay": "Selected Day",
+    "usage.datePicker": "Stats Date",
+    "usage.barTitle": "Daily Usage, Last 7 Days",
+    "usage.barUnit": "total tokens",
+    "usage.pieTitle": "Daily Cache Hit Rate, Last 7 Days",
+    "usage.pieUnit": "cached input / input",
+    "usage.noData": "No token records yet",
+    "usage.maxDay": "High",
+    "usage.minDay": "Low",
+    "usage.cacheToday": "Today hit",
+    "usage.cacheSevenDays": "7-day hit",
+    "usage.cacheMonth": "Month hit",
+    "usage.cachedInput": "Cached input",
+    "usage.totalInput": "Total input",
     "close.title": "Close Codex Switcher?",
-    "close.intro": "Choose whether to minimize to the taskbar or quit the app.",
+    "close.intro": "Choose whether to minimize to the taskbar, minimize to the tray, or quit the app.",
     "close.remember": "Always use this action",
     "close.minimize": "Minimize Window",
+    "close.tray": "Minimize to Tray",
     "close.quit": "Quit App",
     "status.ready": "Ready",
     "status.processing": "Working...",
@@ -274,7 +338,7 @@ const messages = {
     "status.backgroundFailed": "Background usage refresh failed: {error}",
     "status.exhaustedNoTarget": "Current account is exhausted, but no switch target is available",
     "status.autoSwitched": "Current account is exhausted; switched to {email} and closed {count} Codex processes.",
-    "status.autoSwitchQueued": "Current account is exhausted; queued switch to {email}. {count} Codex processes are running. Close Codex and the switcher will switch automatically, then reopen Codex.",
+    "status.autoSwitchQueued": "Current account is exhausted; queued switch to {email}. A Codex conversation/task is still running. The switcher will switch automatically after it finishes, then reopen Codex.",
     "status.autoSwitchQueueCleared": "Current account usage recovered; queued switch was cancelled.",
     "status.accountUsageRefreshed": "Account usage refreshed",
     "status.switched": "Switched to {email}",
@@ -288,7 +352,7 @@ const messages = {
     "status.loginNew": "Current account deleted and {count} Codex processes were closed. {launch}Finish login in official Codex, then return here and click Import/Add Current.",
     "status.refreshFailures": "{message}, {count} accounts failed",
     "quota.empty": "The current account is exhausted. Switch accounts; if auto-switch is enabled, the app will choose a usable account.",
-    "quota.pendingSwitch": "Current account is exhausted; queued switch to {email}. {count} Codex processes are running. Close Codex and the switcher will switch automatically, then reopen Codex.",
+    "quota.pendingSwitch": "Current account is exhausted; queued switch to {email}. A Codex conversation/task is still running. The switcher will switch automatically after it finishes, then reopen Codex.",
     "quota.low": "Current account has only {remaining}% remaining. Consider switching.",
     "empty.noAccounts": "No accounts yet",
     "empty.noMatches": "No matching accounts",
@@ -298,6 +362,16 @@ const messages = {
     "detail.selectHelp": "Account details, usage windows, and switch actions appear here.",
     "detail.fingerprint": "Account fingerprint {id}",
     "detail.usage": "Usage",
+    "detail.tokenUsage": "Local Token Usage",
+    "detail.tokenUsageHelp": "Calculated from local .codex session logs. Conversation text is not read or displayed.",
+    "detail.tokenToday": "Today",
+    "detail.tokenSevenDays": "Last 7 Days",
+    "detail.tokenMonth": "This Month",
+    "detail.tokenInput": "Input",
+    "detail.tokenOutput": "Output",
+    "detail.tokenReasoning": "Reasoning",
+    "detail.tokenEvents": "{count} records",
+    "detail.tokenLatest": "Latest record: {value}",
     "detail.fiveHour": "5-hour window",
     "detail.oneWeek": "7-day window",
     "detail.used": "Used {used}",
@@ -329,6 +403,7 @@ const messages = {
 
 let accounts = [];
 let selectedAccountId;
+let tokenUsageStats;
 let settings = {
   autoSwitchEnabled: false,
   requireSwitchConfirmation: true,
@@ -385,7 +460,23 @@ settingsQuitApp.addEventListener("click", runAction(async () => {
 }));
 
 accountsNav.addEventListener("click", () => showView("accounts"));
+usageNav.addEventListener("click", runAction(async () => {
+  await loadTokenUsageStats();
+  renderUsageView();
+  showView("usage");
+}));
 settingsNav.addEventListener("click", () => showView("settings"));
+
+refreshTokenUsageButton.addEventListener("click", runAction(async () => {
+  await loadTokenUsageStats();
+  renderUsageView();
+  setStatus(t("usage.refresh"));
+}));
+
+usageDateInput.addEventListener("change", runAction(async () => {
+  await loadTokenUsageStats();
+  renderUsageView();
+}));
 
 accountsSplitter.addEventListener("pointerdown", startPaneResize);
 accountsSplitter.addEventListener("dblclick", runAction(async () => {
@@ -486,7 +577,7 @@ for (const input of document.querySelectorAll('input[name="settings-close-behavi
 
 closeDialog.addEventListener("close", async () => {
   const action = closeDialog.returnValue;
-  if (action !== "minimize" && action !== "quit") {
+  if (action !== "minimize" && action !== "tray" && action !== "quit") {
     return;
   }
   try {
@@ -515,13 +606,21 @@ initialize();
 
 async function initialize() {
   await loadSettings();
+  initializeUsageDate();
   applyTheme();
   applyTranslations();
   showView(currentView);
+  await loadTokenUsageStats();
   await loadAccounts(t("status.ready"));
   initializePaneObservers();
   updatePaneDensity();
   startBackgroundRefreshTimer();
+}
+
+function initializeUsageDate() {
+  const today = localDateInputValue(new Date());
+  usageDateInput.value = usageDateInput.value || today;
+  usageDateInput.max = today;
 }
 
 async function loadSettings() {
@@ -543,7 +642,10 @@ function syncSettingsControls() {
     input.checked = input.value === normalizeThemeMode(settings.themeMode);
   }
   settingsRefreshInterval.value = String(clampRefreshInterval(settings.usageRefreshIntervalMinutes));
-  const closeBehavior = settings.closeBehavior === "minimize" || settings.closeBehavior === "quit" ? settings.closeBehavior : "ask";
+  const closeBehavior =
+    settings.closeBehavior === "minimize" || settings.closeBehavior === "tray" || settings.closeBehavior === "quit"
+      ? settings.closeBehavior
+      : "ask";
   const closeInput = document.querySelector(`input[name="settings-close-behavior"][value="${closeBehavior}"]`);
   if (closeInput) {
     closeInput.checked = true;
@@ -559,24 +661,33 @@ async function saveLanguage(uiLanguage) {
 }
 
 function showView(view) {
-  currentView = view === "settings" ? "settings" : "accounts";
+  currentView = view === "settings" || view === "usage" ? view : "accounts";
+  const showingAccounts = currentView === "accounts";
+  const showingUsage = currentView === "usage";
   const showingSettings = currentView === "settings";
-  accountsView.hidden = showingSettings;
-  accountsTopbar.hidden = showingSettings;
-  metricsStrip.hidden = showingSettings;
-  accountsWorkspace.hidden = showingSettings;
+  accountsView.hidden = !showingAccounts;
+  accountsTopbar.hidden = !showingAccounts;
+  metricsStrip.hidden = !showingAccounts;
+  accountsWorkspace.hidden = !showingAccounts;
+  usageView.hidden = !showingUsage;
   settingsView.hidden = !showingSettings;
-  accountsView.style.display = showingSettings ? "none" : "";
-  accountsTopbar.style.display = showingSettings ? "none" : "";
-  metricsStrip.style.display = showingSettings ? "none" : "";
-  accountsWorkspace.style.display = showingSettings ? "none" : "";
+  accountsView.style.display = showingAccounts ? "" : "none";
+  accountsTopbar.style.display = showingAccounts ? "" : "none";
+  metricsStrip.style.display = showingAccounts ? "" : "none";
+  accountsWorkspace.style.display = showingAccounts ? "" : "none";
+  usageView.style.display = showingUsage ? "" : "none";
   settingsView.style.display = showingSettings ? "" : "none";
   document.body.classList.toggle("view-settings", showingSettings);
-  document.body.classList.toggle("view-accounts", !showingSettings);
-  accountsNav.classList.toggle("active", !showingSettings);
+  document.body.classList.toggle("view-usage", showingUsage);
+  document.body.classList.toggle("view-accounts", showingAccounts);
+  accountsNav.classList.toggle("active", showingAccounts);
+  usageNav.classList.toggle("active", showingUsage);
   settingsNav.classList.toggle("active", showingSettings);
   if (showingSettings) {
     settingsView.scrollTop = 0;
+  }
+  if (showingUsage) {
+    usageView.scrollTop = 0;
   }
 }
 
@@ -670,7 +781,11 @@ function startBackgroundRefreshTimer() {
 function refreshAllUsageInBackground() {
   api.refreshAllUsage()
     .then((results) => loadAccounts(refreshSummary(results, t("status.backgroundUpdated")), { reason: "background" }))
-    .catch((error) => setStatus(t("status.backgroundFailed", { error: errorMessage(error) })));
+    .catch(async (error) => {
+      await loadTokenUsageStats();
+      renderUsageView();
+      setStatus(t("status.backgroundFailed", { error: errorMessage(error) }));
+    });
 }
 
 function clampRefreshInterval(value) {
@@ -680,6 +795,7 @@ function clampRefreshInterval(value) {
 
 async function loadAccounts(message, options = {}) {
   accounts = await api.listAccounts();
+  await loadTokenUsageStats();
   if (!selectedAccountId || !accounts.some((account) => account.id === selectedAccountId)) {
     selectedAccountId = accounts.find((account) => account.isCurrent)?.id ?? accounts[0]?.id;
   }
@@ -688,11 +804,28 @@ async function loadAccounts(message, options = {}) {
   await evaluateQuotaActions(options.reason ?? "load");
 }
 
+async function loadTokenUsageStats() {
+  try {
+    tokenUsageStats = await api.getTokenUsageStats({ asOfDate: selectedUsageDate() });
+  } catch {
+    tokenUsageStats = undefined;
+  }
+}
+
+function selectedUsageDate() {
+  return usageDateInput.value || localDateInputValue(new Date());
+}
+
+function localDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function render() {
   renderMetrics();
   renderQuotaWarning();
   renderAccounts();
   renderDetail();
+  renderUsageView();
 }
 
 function renderMetrics() {
@@ -711,8 +844,7 @@ function renderQuotaWarning() {
   if (pendingAutoSwitch) {
     quotaWarningLine.hidden = false;
     quotaWarningLine.textContent = t("quota.pendingSwitch", {
-      email: pendingAutoSwitch.emailMasked,
-      count: pendingAutoSwitch.runningCodexProcesses ?? 0
+      email: pendingAutoSwitch.emailMasked
     });
     return;
   }
@@ -796,24 +928,24 @@ async function queueOrRunAutoSwitch(target) {
     return;
   }
 
-  const runningCodexProcesses = await api.countCodexProcesses();
-  if (runningCodexProcesses > 0) {
-    setPendingAutoSwitch(target, runningCodexProcesses);
+  const activityStatus = await api.getCodexActivityStatus();
+  if (shouldQueueForActivity(activityStatus, pendingAutoSwitch?.activityStatus)) {
+    setPendingAutoSwitch(target, activityStatus);
     return;
   }
 
   await runQueuedAutoSwitch(target);
 }
 
-function setPendingAutoSwitch(target, runningCodexProcesses) {
+function setPendingAutoSwitch(target, activityStatus) {
   pendingAutoSwitch = {
     accountId: target.id,
     emailMasked: target.emailMasked,
     createdAt: Date.now(),
-    runningCodexProcesses
+    activityStatus
   };
   startPendingAutoSwitchTimer();
-  setStatus(t("status.autoSwitchQueued", { email: target.emailMasked, count: runningCodexProcesses }));
+  setStatus(t("status.autoSwitchQueued", { email: target.emailMasked }));
   renderQuotaWarning();
 }
 
@@ -870,9 +1002,9 @@ async function checkPendingAutoSwitch() {
       pendingAutoSwitch.emailMasked = target.emailMasked;
     }
 
-    const runningCodexProcesses = await api.countCodexProcesses();
-    if (runningCodexProcesses > 0) {
-      pendingAutoSwitch.runningCodexProcesses = runningCodexProcesses;
+    const activityStatus = await api.getCodexActivityStatus();
+    if (shouldQueueForActivity(activityStatus, pendingAutoSwitch.activityStatus)) {
+      pendingAutoSwitch.activityStatus = activityStatus;
       render();
       renderQuotaWarning();
       return;
@@ -896,6 +1028,29 @@ async function runQueuedAutoSwitch(target) {
   } finally {
     autoSwitchInProgress = false;
   }
+}
+
+function shouldQueueForActivity(activityStatus, previousActivityStatus) {
+  if (!activityStatus?.isBusy) {
+    return false;
+  }
+  if (activityStatus.reason !== "recent_session_activity") {
+    return true;
+  }
+  if (!previousActivityStatus || previousActivityStatus.reason !== "recent_session_activity") {
+    return true;
+  }
+  return !sameActivitySnapshot(activityStatus.activitySnapshot, previousActivityStatus.activitySnapshot);
+}
+
+function sameActivitySnapshot(left, right) {
+  return Boolean(
+    left &&
+      right &&
+      left.path === right.path &&
+      left.size === right.size &&
+      Math.round(left.mtimeMs) === Math.round(right.mtimeMs)
+  );
 }
 
 function renderAccounts() {
@@ -1194,6 +1349,112 @@ function resetRow(label, window) {
       <strong>${window?.resetAt ? new Date(window.resetAt * 1000).toLocaleString() : t("labels.unknown")}</strong>
     </div>
   `;
+}
+
+function renderUsageView() {
+  const totals = tokenUsageStats?.totals ?? {};
+  const today = totals.today ?? {};
+  const sevenDays = totals.sevenDays ?? {};
+  const month = totals.month ?? {};
+  usageTotalToday.textContent = formatCompactNumber(today.totalTokens ?? 0);
+  usageTotalSevenDays.textContent = formatCompactNumber(sevenDays.totalTokens ?? 0);
+  usageTotalMonth.textContent = formatCompactNumber(month.totalTokens ?? 0);
+  usageAverageCache.textContent = formatPercent(cacheHitRate(sevenDays));
+  usageBarChart.innerHTML = usageBarChartMarkup((tokenUsageStats?.dailySevenDays ?? []).map((day) => ({
+    label: formatUsageDate(day.date),
+    value: day.totalTokens ?? 0
+  })));
+  usagePieChart.innerHTML = usageCacheHitMarkup((tokenUsageStats?.dailySevenDays ?? []).map((day) => ({
+    label: formatUsageDate(day.date),
+    bucket: day
+  })));
+  applyUsageBarWidths();
+}
+
+function formatUsageDate(dateText) {
+  if (!dateText) {
+    return t("labels.unknown");
+  }
+  const date = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return dateText;
+  }
+  return new Intl.DateTimeFormat(currentLanguage(), { month: "2-digit", day: "2-digit" }).format(date);
+}
+
+function usageBarChartMarkup(items) {
+  if (!items.length) {
+    return `<div class="usage-no-data">${t("usage.noData")}</div>`;
+  }
+  const maxValue = Math.max(1, ...items.map((item) => item.value));
+  const nonZeroValues = items.map((item) => item.value).filter((value) => value > 0);
+  const minNonZeroValue = nonZeroValues.length ? Math.min(...nonZeroValues) : undefined;
+  return items
+    .map((item) => {
+      const width = Math.round((item.value / maxValue) * 100);
+      const ratio = Math.round((item.value / maxValue) * 100);
+      const isMax = item.value > 0 && item.value === maxValue;
+      const isMin = minNonZeroValue !== undefined && item.value === minNonZeroValue && item.value !== maxValue;
+      const marker = isMax ? t("usage.maxDay") : isMin ? t("usage.minDay") : "";
+      return `
+        <div class="usage-bar-row ${isMax ? "max" : ""} ${isMin ? "min" : ""}">
+          <span>${escapeHtml(item.label)}</span>
+          <div class="usage-bar-track"><div class="usage-bar-fill" data-fill-percent="${width}"></div></div>
+          <strong>
+            ${marker ? `<em>${escapeHtml(marker)}</em>` : ""}
+            ${formatCompactNumber(item.value)}
+            <small>${ratio}%</small>
+          </strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function usageCacheHitMarkup(items) {
+  if (!items.some((item) => (item.bucket?.inputTokens ?? 0) > 0)) {
+    return `<div class="usage-no-data">${t("usage.noData")}</div>`;
+  }
+  return items
+    .map((item) => {
+      const bucket = item.bucket ?? {};
+      const rate = Math.round(cacheHitRate(bucket));
+      return `
+        <div class="usage-bar-row hit-rate">
+          <span>${escapeHtml(item.label)}</span>
+          <div class="usage-bar-track"><div class="usage-bar-fill" data-fill-percent="${rate}"></div></div>
+          <strong>
+            ${formatPercent(rate)}
+            <small>${formatCompactNumber(bucket.cachedInputTokens ?? 0)} / ${formatCompactNumber(bucket.inputTokens ?? 0)}</small>
+          </strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function applyUsageBarWidths() {
+  for (const fill of document.querySelectorAll(".usage-bar-fill[data-fill-percent]")) {
+    const percent = Math.max(0, Math.min(100, Number(fill.dataset.fillPercent) || 0));
+    fill.style.width = `${percent}%`;
+  }
+}
+
+function cacheHitRate(bucket) {
+  const input = Number(bucket?.inputTokens ?? 0);
+  const cached = Number(bucket?.cachedInputTokens ?? 0);
+  return input > 0 ? Math.max(0, Math.min(100, (cached / input) * 100)) : 0;
+}
+
+function formatPercent(value) {
+  return `${Math.round(Number(value) || 0)}%`;
+}
+
+function formatCompactNumber(value) {
+  return new Intl.NumberFormat(currentLanguage(), {
+    notation: Math.abs(Number(value)) >= 10_000 ? "compact" : "standard",
+    maximumFractionDigits: 1
+  }).format(Number(value) || 0);
 }
 
 function setStatus(message) {
