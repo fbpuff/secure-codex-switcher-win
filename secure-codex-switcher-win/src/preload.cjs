@@ -10,12 +10,14 @@ contextBridge.exposeInMainWorld("codexSwitcher", {
   switchAccount: (accountId, options) => invoke("accounts:switch", accountId, options),
   deleteAccount: (accountId, options) => invoke("accounts:delete", accountId, options),
   pickBestAccount: () => invoke("accounts:pickBest"),
+  getTokenUsageStats: (options) => invoke("tokens:stats", options),
   readSettings: () => invoke("settings:read"),
   updateSettings: (patch) => invoke("settings:update", patch),
   setHttpOnlyMode: (enabled) => invoke("settings:setHttpOnly", enabled),
   quitApp: () => invoke("app:quit"),
   applyCloseDecision: (decision) => invoke("app:applyCloseDecision", decision),
   countCodexProcesses: () => invoke("app:countCodexProcesses"),
+  getCodexActivityStatus: () => invoke("app:getCodexActivityStatus"),
   onCloseDecisionRequested: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("app:requestCloseDecision", handler);

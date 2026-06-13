@@ -2,10 +2,14 @@
 
 Local-only Windows account switcher for Codex / ChatGPT auth files.
 
+中文说明见 [README.zh-CN.md](README.zh-CN.md).
+
 ## Versions
 
 - `v1.1`: resizable account/detail panes, polished responsive account cards, HTTP-only mode documentation, and safer auto-switch deferral.
 - `v2.1`: queued auto-switch. When Codex is running, the Switcher no longer stops at a one-time deferral; it queues the target account, checks every 15 seconds, and completes the switch after Codex exits.
+- `v2.2`: activity-aware auto-switch. The Switcher waits only when a Codex conversation or task appears active; if Codex is open but idle, the queued switch can complete.
+- `v2.3.0`: dedicated local token-usage dashboard with selected-date 7-day charts, daily cache-hit bars, synchronized refresh cadence, and bilingual documentation.
 
 ## Security model
 
@@ -108,13 +112,27 @@ Refresh behavior:
 - While the GUI is open, it refreshes all accounts in the background. The interval defaults to 5 minutes and can be changed in `设置 / Settings`.
 - If `低余量提醒` is enabled, the app shows a red inline warning when the current account drops to 15% remaining or below.
 - If `用尽后自动切换` is enabled, the app switches directly to the best fresh non-current account only when the current account is exhausted. The 15% threshold is just a warning.
-- Automatic switching is conservative: if official Codex processes are still running, the Switcher queues the account change, shows a red inline warning, checks every 15 seconds, and completes the switch after Codex exits.
+- Automatic switching is activity-aware: if a Codex conversation/task is active, the Switcher queues the account change, shows a red inline warning, checks every 15 seconds, and completes the switch once Codex appears idle.
 - Switching writes `%USERPROFILE%\.codex\auth.json`, closes official Codex processes, and then starts official Codex again so the new account is loaded.
 - When official Codex refreshes the current account's auth file, the Switcher automatically updates the matching encrypted account record.
 - Deleting a non-current account only removes the local encrypted Switcher record.
 - Deleting the current account offers two paths:
   - choose an existing saved account, then the Switcher writes that account, closes official Codex, and starts official Codex again;
   - choose new login, then the Switcher closes official Codex, backs up and removes `%USERPROFILE%\.codex\auth.json`, starts official Codex, and waits for you to log in there. After login, return to the GUI and click `导入/新增当前`.
+
+Local token usage:
+
+- The left rail includes a dedicated `Usage / 用量` page above `Settings / 设置`.
+- The usage page shows local token usage for `Selected Day`, `Last 7 Days`, and `This Month`.
+- The page includes a stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
+- The page uses a left-side bar chart for daily totals across the selected 7-day window and marks the highest and lowest non-zero days.
+- The right-side chart shows daily cache hit rate across the same selected 7-day window, calculated as `cached_input_tokens / input_tokens`.
+- The top summary includes average cache hit rate for the selected 7-day window, calculated from total cached input tokens divided by total input tokens in that window.
+- Token usage stats refresh on the same schedule as account usage refresh. The configured `Usage auto-refresh interval` drives both account quota refresh and local token-stat refresh while the GUI is open.
+- This is calculated from `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl` and `%USERPROFILE%\.codex\archived_sessions\**\rollout-*.jsonl`.
+- The parser only reads `timestamp` and `payload.info.last_token_usage`; it does not display conversation text.
+- The statistic is accurate for local rollout records that contain `last_token_usage`, but it is not OpenAI billing data, not cross-device usage, and not currently split by account because Codex rollout usage events do not provide a stable account ID.
+- If Codex logs are deleted, archived elsewhere, or created by a Codex version that did not write `last_token_usage`, those tokens cannot be counted.
 
 The launcher reads `HTTP_PROXY` / `HTTPS_PROXY`. If those are missing, it also reads the current Windows user proxy setting from:
 
@@ -141,7 +159,7 @@ Open `设置 / Settings` from the left rail to change:
 - Auto-switch when the current account is exhausted.
 - Manual switch confirmation.
 - HTTP-only transport for unstable WebSocket proxy environments.
-- Window close behavior: ask every time, minimize to the taskbar, or quit the app.
+- Window close behavior: ask every time, minimize to the taskbar, minimize to the system tray, or quit the app.
 - Open the `%USERPROFILE%\.codex` folder.
 - Fully quit the Switcher app.
 
@@ -159,7 +177,9 @@ Close behavior:
 
 - On the first window close, the app asks whether to minimize or quit. If you choose `Always use this action`, the choice is saved locally in `settings.json`.
 - If close behavior is set to `Minimize window`, clicking the window close button minimizes the app.
+- If close behavior is set to `Minimize to tray`, clicking the window close button hides the app from the taskbar and keeps a tray icon. Use the tray menu or double-click/click the tray icon to show the window again.
 - To fully quit after minimizing, either use `设置 / Settings -> 应用 / App -> 退出应用 / Quit App`, or right-click the minimized taskbar window and choose `关闭窗口 / Close window`.
+- To fully quit after minimizing to tray, use the tray menu `退出应用 / Quit App` or the Settings page quit button.
 - No account tokens or API keys are stored in settings.
 
 Relevant implementation paths:
@@ -167,8 +187,8 @@ Relevant implementation paths:
 - Main close/quit behavior: `src/main.js`.
 - Renderer IPC allowlist for quit: `src/preload.cjs`.
 - Settings UI and event handling: `src/renderer/index.html` and `src/renderer/app.js`.
-- Settings layout and theme styles: `src/renderer/styles.css`.
-- Account switching, queued auto-switch process checks, DPAPI auth storage, and settings normalization: `src/services/account-service.js`.
+- Settings, usage charts, and theme styles: `src/renderer/styles.css`.
+- Account switching, queued auto-switch activity checks, local token usage aggregation, DPAPI auth storage, and settings normalization: `src/services/account-service.js`.
 
 ## Current scope
 
