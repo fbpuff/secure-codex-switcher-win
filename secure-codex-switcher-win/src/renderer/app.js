@@ -35,6 +35,7 @@ const usageAverageCache = document.querySelector("#usage-average-cache");
 const usageBarChart = document.querySelector("#usage-bar-chart");
 const usagePieChart = document.querySelector("#usage-pie-chart");
 const usageDateInput = document.querySelector("#usage-date");
+const usageDateButton = document.querySelector("#usage-date-button");
 const settingsView = document.querySelector("#settings-view");
 const settingsLanguage = document.querySelector("#settings-language");
 const settingsAutoSwitch = document.querySelector("#settings-auto-switch");
@@ -474,9 +475,19 @@ refreshTokenUsageButton.addEventListener("click", runAction(async () => {
 }));
 
 usageDateInput.addEventListener("change", runAction(async () => {
+  clampUsageDateToToday();
   await loadTokenUsageStats();
   renderUsageView();
 }));
+
+usageDateButton.addEventListener("click", () => {
+  refreshUsageDateBounds();
+  if (typeof usageDateInput.showPicker === "function") {
+    usageDateInput.showPicker();
+    return;
+  }
+  usageDateInput.click();
+});
 
 accountsSplitter.addEventListener("pointerdown", startPaneResize);
 accountsSplitter.addEventListener("dblclick", runAction(async () => {
@@ -618,9 +629,8 @@ async function initialize() {
 }
 
 function initializeUsageDate() {
-  const today = localDateInputValue(new Date());
-  usageDateInput.value = usageDateInput.value || today;
-  usageDateInput.max = today;
+  refreshUsageDateBounds();
+  usageDateInput.value = usageDateInput.value || localDateInputValue(new Date());
 }
 
 async function loadSettings() {
@@ -814,6 +824,22 @@ async function loadTokenUsageStats() {
 
 function selectedUsageDate() {
   return usageDateInput.value || localDateInputValue(new Date());
+}
+
+function refreshUsageDateBounds() {
+  const today = localDateInputValue(new Date());
+  usageDateInput.min = "2024-01-01";
+  usageDateInput.max = today;
+  if (!usageDateInput.value) {
+    usageDateInput.value = today;
+  }
+}
+
+function clampUsageDateToToday() {
+  refreshUsageDateBounds();
+  if (usageDateInput.value > usageDateInput.max) {
+    usageDateInput.value = usageDateInput.max;
+  }
 }
 
 function localDateInputValue(date) {

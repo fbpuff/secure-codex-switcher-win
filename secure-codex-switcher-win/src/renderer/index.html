@@ -168,7 +168,10 @@
               <div id="usage-bar-chart" class="usage-bar-chart" aria-label="Token totals by period"></div>
               <label class="usage-date-picker">
                 <span data-i18n="usage.datePicker">统计日期</span>
-                <input id="usage-date" type="date" />
+                <input id="usage-date" class="usage-date-input" type="date" aria-label="Stats date" />
+                <button id="usage-date-button" class="icon-only usage-date-button" type="button" aria-label="Choose stats date" data-i18n-aria-label="usage.datePicker">
+                  <span class="button-icon calendar-icon" aria-hidden="true"></span>
+                </button>
               </label>
             </article>
             <article class="usage-chart-card">

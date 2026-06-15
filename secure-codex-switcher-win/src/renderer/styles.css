@@ -880,13 +880,38 @@ button:disabled {
   font-size: 12px;
 }
 
-.usage-date-picker input {
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--ink);
-  padding: 0 10px;
+.usage-date-input {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.usage-date-button {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
+.calendar-icon::before,
+.calendar-icon::after {
+  position: absolute;
+  content: "";
+}
+
+.calendar-icon::before {
+  inset: 2px 1px 1px;
+  border: 1.8px solid currentColor;
+  border-radius: 3px;
+}
+
+.calendar-icon::after {
+  left: 3px;
+  right: 3px;
+  top: 5px;
+  height: 1.8px;
+  background: currentColor;
 }
 
 .usage-hit-layout {

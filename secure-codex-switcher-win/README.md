@@ -10,6 +10,7 @@ Local-only Windows account switcher for Codex / ChatGPT auth files.
 - `v2.1`: queued auto-switch. When Codex is running, the Switcher no longer stops at a one-time deferral; it queues the target account, checks every 15 seconds, and completes the switch after Codex exits.
 - `v2.2`: activity-aware auto-switch. The Switcher waits only when a Codex conversation or task appears active; if Codex is open but idle, the queued switch can complete.
 - `v2.3.0`: dedicated local token-usage dashboard with selected-date 7-day charts, daily cache-hit bars, synchronized refresh cadence, and bilingual documentation.
+- `v2.3.1`: date picker fix for the usage dashboard. Stats date selection now uses only the calendar icon and refreshes the maximum selectable date whenever the picker opens.
 
 ## Security model
 
@@ -124,7 +125,8 @@ Local token usage:
 
 - The left rail includes a dedicated `Usage / 用量` page above `Settings / 设置`.
 - The usage page shows local token usage for `Selected Day`, `Last 7 Days`, and `This Month`.
-- The page includes a stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
+- The page includes a calendar-icon stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
+- The picker refreshes its maximum selectable date each time it opens, so the current day remains selectable even if the app stays open across midnight.
 - The page uses a left-side bar chart for daily totals across the selected 7-day window and marks the highest and lowest non-zero days.
 - The right-side chart shows daily cache hit rate across the same selected 7-day window, calculated as `cached_input_tokens / input_tokens`.
 - The top summary includes average cache hit rate for the selected 7-day window, calculated from total cached input tokens divided by total input tokens in that window.

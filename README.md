@@ -12,6 +12,7 @@ This project is designed for users who already use the official Codex app or CLI
 - `v2.1`: queued auto-switch. When Codex is running, the Switcher queues the target account, checks every 15 seconds, and completes the switch after Codex exits.
 - `v2.2`: activity-aware auto-switch. The Switcher waits only when a Codex conversation or task appears active; if Codex is open but idle, the queued switch can complete.
 - `v2.3.0`: dedicated local token-usage dashboard with selected-date 7-day charts, daily cache-hit bars, synchronized refresh cadence, and bilingual documentation.
+- `v2.3.1`: date picker fix for the usage dashboard. Stats date selection now uses only the calendar icon and refreshes the maximum selectable date whenever the picker opens.
 
 ## Features
 
@@ -172,7 +173,8 @@ The dashboard shows:
 
 - `Selected Day`, `Last 7 Days`, and `This Month` local token totals.
 - Average cache-hit rate for the selected 7-day window, calculated as `cached_input_tokens / input_tokens`.
-- A stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
+- A calendar-icon stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
+- The picker refreshes its maximum selectable date each time it opens, so the current day remains selectable even if the app stays open across midnight.
 - Daily token usage bars for the selected 7-day window. The highest day is 100%, and other days scale proportionally.
 - Daily cache-hit-rate bars for the same selected 7-day window.
 
