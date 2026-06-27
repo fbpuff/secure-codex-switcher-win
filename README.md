@@ -13,6 +13,7 @@ This project is designed for users who already use the official Codex app or CLI
 - `v2.2`: activity-aware auto-switch. The Switcher waits only when a Codex conversation or task appears active; if Codex is open but idle, the queued switch can complete.
 - `v2.3.0`: dedicated local token-usage dashboard with selected-date 7-day charts, daily cache-hit bars, synchronized refresh cadence, and bilingual documentation.
 - `v2.3.1`: date picker fix for the usage dashboard. Stats date selection now uses only the calendar icon and refreshes the maximum selectable date whenever the picker opens.
+- `v2.3.2`: stability fixes. Auto-switch waits for 90 seconds of continuous quiet time after detected activity; transient main-process network disconnects are logged and shown as UI status instead of fatal dialogs; 401 usage-refresh failures are reported as login-refresh-needed states; usage dates follow today unless the user manually selected a historical date.
 
 ## Features
 
@@ -25,7 +26,7 @@ This project is designed for users who already use the official Codex app or CLI
 - Supports current nested Codex auth format under `tokens`.
 - Refreshes usage while the GUI is open and shows 5-hour / 7-day quota windows when the upstream endpoint allows it.
 - Shows low-quota warnings and can switch automatically only when the current account is exhausted.
-- Uses activity-aware queued auto-switching so active Codex conversations are not interrupted by automatic account changes.
+- Uses activity-aware queued auto-switching so active or just-finished Codex conversations are not interrupted by automatic account changes.
 - Provides a dedicated `Usage / 用量` dashboard for local token totals and cache-hit trends from Codex rollout logs.
 - Supports minimize-to-tray and configurable close behavior.
 
@@ -154,7 +155,7 @@ Refresh behavior:
 - Per-account `刷新` refreshes one account.
 - While the GUI is open, all accounts refresh every 5 minutes.
 - Low-quota warning appears at 15% remaining or below.
-- Auto-switch only triggers when the current account is exhausted.
+- Auto-switch only triggers when the current account is exhausted, and it waits for 90 seconds of continuous quiet time after detected Codex activity.
 - Local token usage stats refresh on the same interval as account usage refresh while the GUI is open.
 
 Common failures:
@@ -175,6 +176,7 @@ The dashboard shows:
 - Average cache-hit rate for the selected 7-day window, calculated as `cached_input_tokens / input_tokens`.
 - A calendar-icon stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
 - The picker refreshes its maximum selectable date each time it opens, so the current day remains selectable even if the app stays open across midnight.
+- If the user has not manually selected a historical date, the usage page follows today whenever it refreshes or is reopened. After a historical date is selected, that date is kept until the user selects today again.
 - Daily token usage bars for the selected 7-day window. The highest day is 100%, and other days scale proportionally.
 - Daily cache-hit-rate bars for the same selected 7-day window.
 
@@ -256,6 +258,10 @@ Relevant implementation paths:
 
 - Main close/quit behavior: `secure-codex-switcher-win/src/main.js`.
 - Renderer IPC allowlist for quit: `secure-codex-switcher-win/src/preload.cjs`.
+- Auto-switch quiet-period decision: `secure-codex-switcher-win/src/core/activity-switching.js`.
+- Main-process network error classification: `secure-codex-switcher-win/src/core/main-errors.js`.
+- Usage-refresh error classification: `secure-codex-switcher-win/src/core/refresh-status.js`.
+- Usage-date follow-today logic: `secure-codex-switcher-win/src/core/usage-date.js`.
 - Settings UI and event handling: `secure-codex-switcher-win/src/renderer/index.html` and `secure-codex-switcher-win/src/renderer/app.js`.
 - Settings, usage charts, and theme styles: `secure-codex-switcher-win/src/renderer/styles.css`.
 - HTTP-only config management: `secure-codex-switcher-win/src/core/codex-config.js`.

@@ -13,6 +13,7 @@
 - `v2.2`：基于对话活动的自动切换。只有检测到 Codex 对话或任务仍活跃时才等待；如果 Codex 打开但空闲，排队切换可以继续完成。
 - `v2.3.0`：新增独立本地 token 用量页面，支持选择统计日期、7 天每日用量横条图、7 天每日缓存命中率横条图、与账号余量一致的刷新节奏，以及中英文文档。
 - `v2.3.1`：修复用量页面日期选择器。统计日期现在只通过日历图标选择，并且每次打开日历前都会刷新最大可选日期。
+- `v2.3.2`：稳定性修复。自动切换在检测到对话活动后会等待 90 秒连续空闲再切换；后台网络断连会记录日志并在界面提示，不再弹出主进程错误；401 用量刷新失败会明确提示需要刷新登录态；用量日期在未手动选择历史日期时会自动跟随今天。
 
 ## 功能
 
@@ -25,7 +26,7 @@
 - 支持新版 Codex `tokens` 嵌套 auth 结构。
 - GUI 打开时会定时刷新用量，并在接口允许时显示 5 小时 / 7 天窗口。
 - 支持低余量提醒；自动切换只会在当前账号用尽时触发。
-- 自动切换具备活动感知排队能力，不会在 Codex 对话或任务仍活跃时强行自动切换。
+- 自动切换具备活动感知排队能力，不会在 Codex 对话或任务仍活跃或刚结束时强行自动切换。
 - 提供独立 `用量 / Usage` 页面，从 Codex 本地 rollout 日志统计 token 总量和缓存命中率趋势。
 - 支持最小化到托盘和可配置关闭行为。
 - GUI 支持中文和英文，选择会保存到本地设置。
@@ -153,7 +154,7 @@ GUI 会导入官方 Codex 的 auth 文件：
 - 单个账号的 `刷新` 只刷新该账号。
 - GUI 打开时，每 5 分钟后台刷新一次。
 - 低余量提醒默认在剩余 15% 或以下时显示。
-- 自动切换只在当前账号用尽时触发。
+- 自动切换只在当前账号用尽时触发，并且检测到活动后需要 90 秒连续空闲才会执行。
 - 本地 token 用量统计与账号余量刷新使用相同后台间隔。
 
 常见失败：
@@ -174,6 +175,7 @@ GUI 会导入官方 Codex 的 auth 文件：
 - `平均缓存命中率`，口径为选中 7 天窗口内 `cached_input_tokens / input_tokens`。
 - 通过日历图标打开统计日期选择器。选择某一天后，会显示该日和前 6 个自然日，共 7 天。
 - 每次打开日期选择器前都会刷新最大可选日期，即使应用跨天未重启，也能选择当天。
+- 如果用户没有手动选择历史日期，用量页会在刷新或重新进入页面时自动切换到今天；手动选择历史日期后会保留该日期，直到再次选择今天。
 - 左侧横条图显示选中 7 天窗口内每天的 token 总量，最高日为 100%，其他日期等比例缩放。
 - 右侧横条图显示同一个 7 天窗口内每天的缓存命中率，按 0-100% 缩放。
 
@@ -254,6 +256,10 @@ GUI 会导入官方 Codex 的 auth 文件：
 
 - 主进程关闭/退出逻辑：`secure-codex-switcher-win/src/main.js`。
 - Renderer 退出 IPC allowlist：`secure-codex-switcher-win/src/preload.cjs`。
+- 自动切换空闲等待决策：`secure-codex-switcher-win/src/core/activity-switching.js`。
+- 主进程网络错误分类：`secure-codex-switcher-win/src/core/main-errors.js`。
+- 用量刷新错误分类：`secure-codex-switcher-win/src/core/refresh-status.js`。
+- 用量日期跟随今天逻辑：`secure-codex-switcher-win/src/core/usage-date.js`。
 - 设置页结构和事件：`secure-codex-switcher-win/src/renderer/index.html`、`secure-codex-switcher-win/src/renderer/app.js`。
 - 设置、用量图表和主题样式：`secure-codex-switcher-win/src/renderer/styles.css`。
 - HTTP-only 配置管理：`secure-codex-switcher-win/src/core/codex-config.js`。

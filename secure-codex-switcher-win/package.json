@@ -1,6 +1,6 @@
 {
   "name": "secure-codex-switcher-win",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "private": true,
   "description": "A local-only Windows Codex account switcher with encrypted account storage and usage-aware switching.",
   "type": "module",

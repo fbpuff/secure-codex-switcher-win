@@ -1,8 +1,10 @@
 import { app, BrowserWindow, ipcMain, shell, Menu, nativeImage, Tray } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAccountService } from "./services/account-service.js";
 import { createProxyAwareFetch } from "./core/proxy-fetch.js";
+import { formatMainProcessError, isRecoverableMainProcessError } from "./core/main-errors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,6 +17,40 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
   app.quit();
+}
+
+process.on("uncaughtException", (error) => {
+  handleMainProcessFailure("uncaughtException", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  handleMainProcessFailure("unhandledRejection", reason);
+});
+
+function handleMainProcessFailure(source, error) {
+  appendMainProcessLog(source, error);
+  if (!isRecoverableMainProcessError(error)) {
+    mainWindow?.webContents.send("app:mainProcessWarning", {
+      message: "Codex Switcher 主进程发生错误，已记录到日志。"
+    });
+    app.exit(1);
+    return;
+  }
+  mainWindow?.webContents.send("app:mainProcessWarning", {
+    message: "后台网络连接被代理或远端关闭，Codex Switcher 已继续运行。"
+  });
+}
+
+function appendMainProcessLog(source, error) {
+  try {
+    const userDataPath = app.isReady() ? app.getPath("userData") : path.join(process.env.APPDATA || __dirname, "secure-codex-switcher-win");
+    fs.mkdirSync(userDataPath, { recursive: true });
+    fs.appendFileSync(
+      path.join(userDataPath, "main-process.log"),
+      `[${new Date().toISOString()}] ${source}\n${formatMainProcessError(error)}\n\n`,
+      "utf8"
+    );
+  } catch {}
 }
 
 function createMainWindow() {

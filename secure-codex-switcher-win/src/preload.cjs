@@ -23,5 +23,10 @@ contextBridge.exposeInMainWorld("codexSwitcher", {
     ipcRenderer.on("app:requestCloseDecision", handler);
     return () => ipcRenderer.removeListener("app:requestCloseDecision", handler);
   },
+  onMainProcessWarning: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("app:mainProcessWarning", handler);
+    return () => ipcRenderer.removeListener("app:mainProcessWarning", handler);
+  },
   openCodexFolder: () => invoke("system:openCodexFolder")
 });

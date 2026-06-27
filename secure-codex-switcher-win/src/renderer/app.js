@@ -1,3 +1,7 @@
+import { decideAutoSwitchActivity } from "../core/activity-switching.js";
+import { classifyRefreshResults, isLoginRefreshError } from "../core/refresh-status.js";
+import { localDateInputValue, nextUsageDateState, usageDateFollowsToday } from "../core/usage-date.js";
+
 const api = window.codexSwitcher;
 
 const accountsEl = document.querySelector("#accounts");
@@ -164,7 +168,7 @@ const messages = {
     "status.backgroundFailed": "后台余量刷新失败：{error}",
     "status.exhaustedNoTarget": "当前账号已用尽，但没有可切换账号",
     "status.autoSwitched": "当前账号已用尽，已自动切换到 {email}，并关闭 {count} 个 Codex 进程。",
-    "status.autoSwitchQueued": "当前账号已用尽，已排队切换到 {email}。检测到正在运行的 Codex 对话/任务，完成后将自动切换并重新打开。",
+    "status.autoSwitchQueued": "当前账号已用尽，已排队切换到 {email}。检测到正在运行或刚结束的 Codex 对话/任务，保持短暂空闲后将自动切换并重新打开。",
     "status.autoSwitchQueueCleared": "当前账号余量已恢复，已取消排队切换。",
     "status.accountUsageRefreshed": "账号余量已刷新",
     "status.switched": "账号已切换到 {email}",
@@ -177,8 +181,12 @@ const messages = {
     "status.transportWarning": "HTTP-only 配置校验失败：{error}",
     "status.loginNew": "当前账号已删除，并关闭 {count} 个 Codex 进程。{launch}请在官方 Codex 完成新账号登录，然后回到这里点击“导入/新增当前”。",
     "status.refreshFailures": "{message}，{count} 个账号刷新失败",
+    "status.refreshLoginNeeded": "{message}；{count} 个账号需要重新登录，已在账号卡片中标出。",
+    "status.refreshMixedFailures": "{message}；{count} 个账号需要处理，其中 {loginCount} 个需要重新登录。",
+    "status.accountNeedsLogin": "{email} 需要重新登录。请切换到该账号并重新打开官方 Codex，刷新登录态后再导入/刷新。",
+    "status.accountRefreshFailed": "{email} 余量刷新失败：{error}",
     "quota.empty": "当前账号余量已用尽，建议切换账号；如果已开启自动切换，应用会选择可用账号。",
-    "quota.pendingSwitch": "当前账号已用尽，已排队切换到 {email}。检测到正在运行的 Codex 对话/任务，完成后将自动切换并重新打开。",
+    "quota.pendingSwitch": "当前账号已用尽，已排队切换到 {email}。检测到正在运行或刚结束的 Codex 对话/任务，保持短暂空闲后将自动切换并重新打开。",
     "quota.low": "当前账号余量只剩 {remaining}%，建议切换账号。",
     "empty.noAccounts": "还没有账号",
     "empty.noMatches": "没有匹配账号",
@@ -339,7 +347,7 @@ const messages = {
     "status.backgroundFailed": "Background usage refresh failed: {error}",
     "status.exhaustedNoTarget": "Current account is exhausted, but no switch target is available",
     "status.autoSwitched": "Current account is exhausted; switched to {email} and closed {count} Codex processes.",
-    "status.autoSwitchQueued": "Current account is exhausted; queued switch to {email}. A Codex conversation/task is still running. The switcher will switch automatically after it finishes, then reopen Codex.",
+    "status.autoSwitchQueued": "Current account is exhausted; queued switch to {email}. A Codex conversation/task is running or just finished. The switcher will switch after a short quiet period, then reopen Codex.",
     "status.autoSwitchQueueCleared": "Current account usage recovered; queued switch was cancelled.",
     "status.accountUsageRefreshed": "Account usage refreshed",
     "status.switched": "Switched to {email}",
@@ -352,8 +360,12 @@ const messages = {
     "status.transportWarning": "HTTP-only configuration check failed: {error}",
     "status.loginNew": "Current account deleted and {count} Codex processes were closed. {launch}Finish login in official Codex, then return here and click Import/Add Current.",
     "status.refreshFailures": "{message}, {count} accounts failed",
+    "status.refreshLoginNeeded": "{message}; {count} accounts need login refresh and are marked on their account cards.",
+    "status.refreshMixedFailures": "{message}; {count} accounts need attention, including {loginCount} login refreshes.",
+    "status.accountNeedsLogin": "{email} needs login refresh. Switch to that account, reopen official Codex, then import/refresh again.",
+    "status.accountRefreshFailed": "{email} usage refresh failed: {error}",
     "quota.empty": "The current account is exhausted. Switch accounts; if auto-switch is enabled, the app will choose a usable account.",
-    "quota.pendingSwitch": "Current account is exhausted; queued switch to {email}. A Codex conversation/task is still running. The switcher will switch automatically after it finishes, then reopen Codex.",
+    "quota.pendingSwitch": "Current account is exhausted; queued switch to {email}. A Codex conversation/task is running or just finished. The switcher will switch after a short quiet period, then reopen Codex.",
     "quota.low": "Current account has only {remaining}% remaining. Consider switching.",
     "empty.noAccounts": "No accounts yet",
     "empty.noMatches": "No matching accounts",
@@ -419,10 +431,12 @@ let settings = {
 };
 let autoSwitchInProgress = false;
 let backgroundRefreshTimer;
+let backgroundRefreshInProgress = false;
 let pendingAutoSwitch;
 let pendingAutoSwitchTimer;
 let pendingAutoSwitchCheckInProgress = false;
 let currentView = "accounts";
+let usageDateTracksToday = true;
 const pendingAutoSwitchIntervalMs = 15_000;
 
 document.querySelector("#import-current").addEventListener("click", runAction(async () => {
@@ -462,6 +476,7 @@ settingsQuitApp.addEventListener("click", runAction(async () => {
 
 accountsNav.addEventListener("click", () => showView("accounts"));
 usageNav.addEventListener("click", runAction(async () => {
+  syncUsageDateWithToday();
   await loadTokenUsageStats();
   renderUsageView();
   showView("usage");
@@ -469,6 +484,7 @@ usageNav.addEventListener("click", runAction(async () => {
 settingsNav.addEventListener("click", () => showView("settings"));
 
 refreshTokenUsageButton.addEventListener("click", runAction(async () => {
+  syncUsageDateWithToday();
   await loadTokenUsageStats();
   renderUsageView();
   setStatus(t("usage.refresh"));
@@ -476,12 +492,13 @@ refreshTokenUsageButton.addEventListener("click", runAction(async () => {
 
 usageDateInput.addEventListener("change", runAction(async () => {
   clampUsageDateToToday();
+  usageDateTracksToday = usageDateFollowsToday(usageDateInput.value, localDateInputValue(new Date()));
   await loadTokenUsageStats();
   renderUsageView();
 }));
 
 usageDateButton.addEventListener("click", () => {
-  refreshUsageDateBounds();
+  syncUsageDateWithToday();
   if (typeof usageDateInput.showPicker === "function") {
     usageDateInput.showPicker();
     return;
@@ -613,6 +630,10 @@ api.onCloseDecisionRequested(() => {
   closeDialog.showModal();
 });
 
+api.onMainProcessWarning((payload) => {
+  setStatus(payload?.message || t("status.backgroundFailed", { error: t("labels.unknown") }));
+});
+
 initialize();
 
 async function initialize() {
@@ -629,8 +650,8 @@ async function initialize() {
 }
 
 function initializeUsageDate() {
-  refreshUsageDateBounds();
-  usageDateInput.value = usageDateInput.value || localDateInputValue(new Date());
+  usageDateTracksToday = true;
+  syncUsageDateWithToday();
 }
 
 async function loadSettings() {
@@ -789,12 +810,19 @@ function startBackgroundRefreshTimer() {
 }
 
 function refreshAllUsageInBackground() {
+  if (backgroundRefreshInProgress) {
+    return;
+  }
+  backgroundRefreshInProgress = true;
   api.refreshAllUsage()
     .then((results) => loadAccounts(refreshSummary(results, t("status.backgroundUpdated")), { reason: "background" }))
     .catch(async (error) => {
       await loadTokenUsageStats();
       renderUsageView();
       setStatus(t("status.backgroundFailed", { error: errorMessage(error) }));
+    })
+    .finally(() => {
+      backgroundRefreshInProgress = false;
     });
 }
 
@@ -816,6 +844,7 @@ async function loadAccounts(message, options = {}) {
 
 async function loadTokenUsageStats() {
   try {
+    syncUsageDateWithToday();
     tokenUsageStats = await api.getTokenUsageStats({ asOfDate: selectedUsageDate() });
   } catch {
     tokenUsageStats = undefined;
@@ -835,15 +864,24 @@ function refreshUsageDateBounds() {
   }
 }
 
+function syncUsageDateWithToday() {
+  const today = localDateInputValue(new Date());
+  usageDateInput.min = "2024-01-01";
+  usageDateInput.max = today;
+  const next = nextUsageDateState({
+    value: usageDateInput.value,
+    today,
+    followsToday: usageDateTracksToday
+  });
+  usageDateInput.value = next.value;
+  usageDateTracksToday = next.followsToday;
+}
+
 function clampUsageDateToToday() {
   refreshUsageDateBounds();
   if (usageDateInput.value > usageDateInput.max) {
     usageDateInput.value = usageDateInput.max;
   }
-}
-
-function localDateInputValue(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function render() {
@@ -955,20 +993,23 @@ async function queueOrRunAutoSwitch(target) {
   }
 
   const activityStatus = await api.getCodexActivityStatus();
-  if (shouldQueueForActivity(activityStatus, pendingAutoSwitch?.activityStatus)) {
-    setPendingAutoSwitch(target, activityStatus);
+  const activityDecision = decideAutoSwitchActivity(activityStatus, pendingAutoSwitch);
+  if (activityDecision.shouldQueue) {
+    setPendingAutoSwitch(target, activityDecision);
     return;
   }
 
   await runQueuedAutoSwitch(target);
 }
 
-function setPendingAutoSwitch(target, activityStatus) {
+function setPendingAutoSwitch(target, activityDecision) {
   pendingAutoSwitch = {
     accountId: target.id,
     emailMasked: target.emailMasked,
     createdAt: Date.now(),
-    activityStatus
+    activityStatus: activityDecision.activityStatus,
+    lastBusyAt: activityDecision.lastBusyAt,
+    quietUntilMs: activityDecision.quietUntilMs
   };
   startPendingAutoSwitchTimer();
   setStatus(t("status.autoSwitchQueued", { email: target.emailMasked }));
@@ -1029,8 +1070,11 @@ async function checkPendingAutoSwitch() {
     }
 
     const activityStatus = await api.getCodexActivityStatus();
-    if (shouldQueueForActivity(activityStatus, pendingAutoSwitch.activityStatus)) {
-      pendingAutoSwitch.activityStatus = activityStatus;
+    const activityDecision = decideAutoSwitchActivity(activityStatus, pendingAutoSwitch);
+    if (activityDecision.shouldQueue) {
+      pendingAutoSwitch.activityStatus = activityDecision.activityStatus;
+      pendingAutoSwitch.lastBusyAt = activityDecision.lastBusyAt;
+      pendingAutoSwitch.quietUntilMs = activityDecision.quietUntilMs;
       render();
       renderQuotaWarning();
       return;
@@ -1056,27 +1100,16 @@ async function runQueuedAutoSwitch(target) {
   }
 }
 
-function shouldQueueForActivity(activityStatus, previousActivityStatus) {
-  if (!activityStatus?.isBusy) {
-    return false;
+async function refreshAccountUsage(account) {
+  try {
+    await api.refreshUsage(account.id, true);
+    await loadAccounts(t("status.accountUsageRefreshed"));
+  } catch (error) {
+    const message = isLoginRefreshError(error)
+      ? t("status.accountNeedsLogin", { email: account.emailMasked })
+      : t("status.accountRefreshFailed", { email: account.emailMasked, error: errorMessage(error) });
+    await loadAccounts(message);
   }
-  if (activityStatus.reason !== "recent_session_activity") {
-    return true;
-  }
-  if (!previousActivityStatus || previousActivityStatus.reason !== "recent_session_activity") {
-    return true;
-  }
-  return !sameActivitySnapshot(activityStatus.activitySnapshot, previousActivityStatus.activitySnapshot);
-}
-
-function sameActivitySnapshot(left, right) {
-  return Boolean(
-    left &&
-      right &&
-      left.path === right.path &&
-      left.size === right.size &&
-      Math.round(left.mtimeMs) === Math.round(right.mtimeMs)
-  );
 }
 
 function renderAccounts() {
@@ -1128,10 +1161,7 @@ function renderAccounts() {
     });
     node.querySelector('[data-action="switch"]').disabled = account.isCurrent;
     node.querySelector('[data-action="switch"]').addEventListener("click", stopAndRun(async () => switchAccount(account)));
-    node.querySelector('[data-action="refresh"]').addEventListener("click", stopAndRun(async () => {
-      await api.refreshUsage(account.id, true);
-      await loadAccounts(t("status.accountUsageRefreshed"));
-    }));
+    node.querySelector('[data-action="refresh"]').addEventListener("click", stopAndRun(async () => refreshAccountUsage(account)));
     node.querySelector('[data-action="delete"]').addEventListener("click", stopAndRun(async () => deleteAccount(account)));
     accountsEl.append(node);
   }
@@ -1214,10 +1244,7 @@ function renderDetail() {
   `;
 
   detailEl.querySelector("#detail-switch")?.addEventListener("click", runAction(async () => switchAccount(account)));
-  detailEl.querySelector("#detail-refresh")?.addEventListener("click", runAction(async () => {
-    await api.refreshUsage(account.id, true);
-    await loadAccounts(t("status.accountUsageRefreshed"));
-  }));
+  detailEl.querySelector("#detail-refresh")?.addEventListener("click", runAction(async () => refreshAccountUsage(account)));
   detailEl.querySelector("#detail-delete")?.addEventListener("click", runAction(async () => deleteAccount(account)));
   for (const ring of detailEl.querySelectorAll("[data-progress]")) {
     ring.style.setProperty("--quota-progress", `${ring.dataset.progress}%`);
@@ -1527,8 +1554,21 @@ function hasFreshUsableUsage(account) {
 }
 
 function refreshSummary(results, successMessage) {
-  const failures = Array.isArray(results) ? results.filter((result) => !result.ok).length : 0;
-  return failures > 0 ? t("status.refreshFailures", { message: successMessage, count: failures }) : successMessage;
+  const summary = classifyRefreshResults(results);
+  if (summary.failures === 0) {
+    return successMessage;
+  }
+  if (summary.loginFailures > 0 && summary.otherFailures === 0) {
+    return t("status.refreshLoginNeeded", { message: successMessage, count: summary.loginFailures });
+  }
+  if (summary.loginFailures > 0) {
+    return t("status.refreshMixedFailures", {
+      message: successMessage,
+      count: summary.failures,
+      loginCount: summary.loginFailures
+    });
+  }
+  return t("status.refreshFailures", { message: successMessage, count: summary.failures });
 }
 
 function initials(account) {

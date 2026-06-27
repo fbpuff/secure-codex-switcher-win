@@ -11,6 +11,7 @@ English documentation: [README.md](README.md).
 - `v2.2`：基于对话活动的自动切换。只有检测到 Codex 对话或任务仍活跃时才等待；如果 Codex 打开但空闲，排队切换可以继续完成。
 - `v2.3.0`：新增独立本地 token 用量页面，支持选择统计日期、7 天每日用量横条图、7 天每日缓存命中率横条图、与账号余量一致的刷新节奏，以及中英文文档。
 - `v2.3.1`：修复用量页面日期选择器。统计日期现在只通过日历图标选择，并且每次打开日历前都会刷新最大可选日期。
+- `v2.3.2`：稳定性修复。自动切换在检测到对话活动后会等待 90 秒连续空闲再切换；后台网络断连会记录日志并在界面提示，不再弹出主进程错误；401 用量刷新失败会明确提示需要刷新登录态；用量日期在未手动选择历史日期时会自动跟随今天。
 
 ## 安全模型
 
@@ -110,9 +111,10 @@ node --check src\services\account-service.js
 - GUI 打开期间会后台刷新所有账号，默认间隔 5 分钟，可在 `设置 / Settings` 中修改。
 - 开启 `低余量提醒` 后，当前账号剩余低于 15% 时会在账号页显示红色内联提醒。
 - 开启 `用尽后自动切换` 后，只有当前账号耗尽时才会自动切换到最佳可用账号。15% 阈值只是提醒，不会触发切换。
-- 自动切换是活动感知的：如果 Codex 对话或任务仍活跃，Switcher 会排队目标账号，显示红色内联提示，每 15 秒检查一次，等 Codex 看起来空闲后完成切换。
+- 自动切换是活动感知的：如果 Codex 对话或任务仍活跃，Switcher 会排队目标账号，显示红色内联提示，每 15 秒检查一次，等 Codex 连续空闲 90 秒后完成切换，降低对话刚结束就误切的风险。
 - 切换时会写入 `%USERPROFILE%\.codex\auth.json`，关闭官方 Codex 进程，然后重新启动官方 Codex，使新账号生效。
 - 官方 Codex 刷新当前账号 auth 文件时，Switcher 会自动同步更新匹配的本地加密账号记录。
+- 如果某个保存账号的用量接口返回 401，界面会标记该账号需要刷新登录态。通常需要先切换到该账号，重新打开官方 Codex，让官方 Codex 刷新 auth 后再回到 Switcher 刷新或重新导入。
 - 删除非当前账号只删除 Switcher 本地加密记录，不关闭官方 Codex。
 - 删除当前账号时有两个选择：
   - 选择一个已有账号，Switcher 会写入该账号、关闭官方 Codex 并重新启动；
@@ -136,6 +138,7 @@ HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings
 - `平均缓存命中率`，口径为选中 7 天窗口内 `cached_input_tokens / input_tokens`。
 - 通过日历图标打开统计日期选择器。选择某一天后，会显示该日和前 6 个自然日，共 7 天。
 - 每次打开日期选择器前都会刷新最大可选日期，即使应用跨天未重启，也能选择当天。
+- 如果用户没有手动选择历史日期，用量页会在刷新或重新进入页面时自动切换到今天；手动选择历史日期后会保留该日期，直到再次选择今天。
 - 左侧横条图显示选中 7 天窗口内每天的 token 总量，并标记最高和最低非零日期。
 - 右侧横条图显示同一个 7 天窗口内每天的缓存命中率。
 - 横条宽度按比例显示：最高日为 100%，其他日期按 `当天 token / 最高日 token` 缩放；命中率按 0-100% 缩放。
@@ -205,6 +208,10 @@ manifest 只包含 provider 元数据，不包含 auth token、API key 或对话
 
 - 主进程关闭、托盘和 IPC：`src/main.js`
 - Renderer IPC 白名单：`src/preload.cjs`
+- 自动切换空闲等待决策：`src/core/activity-switching.js`
+- 主进程网络错误分类：`src/core/main-errors.js`
+- 用量刷新错误分类：`src/core/refresh-status.js`
+- 用量日期跟随今天逻辑：`src/core/usage-date.js`
 - 设置、用量页面和事件处理：`src/renderer/index.html`、`src/renderer/app.js`
 - 主题、设置和用量图表样式：`src/renderer/styles.css`
 - 账号切换、自动切换活动检测、本地 token 聚合、DPAPI 存储和设置规范化：`src/services/account-service.js`

@@ -11,6 +11,7 @@ Local-only Windows account switcher for Codex / ChatGPT auth files.
 - `v2.2`: activity-aware auto-switch. The Switcher waits only when a Codex conversation or task appears active; if Codex is open but idle, the queued switch can complete.
 - `v2.3.0`: dedicated local token-usage dashboard with selected-date 7-day charts, daily cache-hit bars, synchronized refresh cadence, and bilingual documentation.
 - `v2.3.1`: date picker fix for the usage dashboard. Stats date selection now uses only the calendar icon and refreshes the maximum selectable date whenever the picker opens.
+- `v2.3.2`: stability fixes. Auto-switch waits for 90 seconds of continuous quiet time after detected activity; transient main-process network disconnects are logged and shown as UI status instead of fatal dialogs; 401 usage-refresh failures are reported as login-refresh-needed states; usage dates follow today unless the user manually selected a historical date.
 
 ## Security model
 
@@ -113,9 +114,10 @@ Refresh behavior:
 - While the GUI is open, it refreshes all accounts in the background. The interval defaults to 5 minutes and can be changed in `设置 / Settings`.
 - If `低余量提醒` is enabled, the app shows a red inline warning when the current account drops to 15% remaining or below.
 - If `用尽后自动切换` is enabled, the app switches directly to the best fresh non-current account only when the current account is exhausted. The 15% threshold is just a warning.
-- Automatic switching is activity-aware: if a Codex conversation/task is active, the Switcher queues the account change, shows a red inline warning, checks every 15 seconds, and completes the switch once Codex appears idle.
+- Automatic switching is activity-aware: if a Codex conversation/task is active, the Switcher queues the account change, shows a red inline warning, checks every 15 seconds, and completes the switch after Codex stays quiet for 90 continuous seconds.
 - Switching writes `%USERPROFILE%\.codex\auth.json`, closes official Codex processes, and then starts official Codex again so the new account is loaded.
 - When official Codex refreshes the current account's auth file, the Switcher automatically updates the matching encrypted account record.
+- If a saved account's usage refresh returns 401, the UI marks that account as needing a login refresh. Usually you need to switch to that account, reopen official Codex so it refreshes auth, then refresh or re-import in the Switcher.
 - Deleting a non-current account only removes the local encrypted Switcher record.
 - Deleting the current account offers two paths:
   - choose an existing saved account, then the Switcher writes that account, closes official Codex, and starts official Codex again;
@@ -127,6 +129,7 @@ Local token usage:
 - The usage page shows local token usage for `Selected Day`, `Last 7 Days`, and `This Month`.
 - The page includes a calendar-icon stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
 - The picker refreshes its maximum selectable date each time it opens, so the current day remains selectable even if the app stays open across midnight.
+- If the user has not manually selected a historical date, the usage page follows today whenever it refreshes or is reopened. After a historical date is selected, that date is kept until the user selects today again.
 - The page uses a left-side bar chart for daily totals across the selected 7-day window and marks the highest and lowest non-zero days.
 - The right-side chart shows daily cache hit rate across the same selected 7-day window, calculated as `cached_input_tokens / input_tokens`.
 - The top summary includes average cache hit rate for the selected 7-day window, calculated from total cached input tokens divided by total input tokens in that window.
@@ -188,6 +191,10 @@ Relevant implementation paths:
 
 - Main close/quit behavior: `src/main.js`.
 - Renderer IPC allowlist for quit: `src/preload.cjs`.
+- Auto-switch quiet-period decision: `src/core/activity-switching.js`.
+- Main-process network error classification: `src/core/main-errors.js`.
+- Usage-refresh error classification: `src/core/refresh-status.js`.
+- Usage-date follow-today logic: `src/core/usage-date.js`.
 - Settings UI and event handling: `src/renderer/index.html` and `src/renderer/app.js`.
 - Settings, usage charts, and theme styles: `src/renderer/styles.css`.
 - Account switching, queued auto-switch activity checks, local token usage aggregation, DPAPI auth storage, and settings normalization: `src/services/account-service.js`.
