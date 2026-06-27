@@ -68,7 +68,7 @@
 克隆仓库：
 
 ```powershell
-git clone https://github.com/your-org-or-username/secure-codex-switcher-win.git
+git clone https://github.com/<your-org-or-username>/secure-codex-switcher-win.git
 cd secure-codex-switcher-win
 ```
 

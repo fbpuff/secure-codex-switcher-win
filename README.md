@@ -67,7 +67,7 @@ This is still a local tool that handles sensitive auth material. Do not upload y
 Clone the repository:
 
 ```powershell
-git clone https://github.com/your-org-or-username/secure-codex-switcher-win.git
+git clone https://github.com/<your-org-or-username>/secure-codex-switcher-win.git
 cd secure-codex-switcher-win
 ```
 
