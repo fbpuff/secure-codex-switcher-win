@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
-$workspaceRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$appRoot = Join-Path $workspaceRoot "secure-codex-switcher-win"
-$electronExe = Join-Path $appRoot "node_modules\electron\dist\electron.exe"
+$appRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$packagedExe = Join-Path $appRoot "dist\win-unpacked\Secure Codex Switcher.exe"
+$shortcutIcon = Join-Path $appRoot "dist\win-unpacked\resources\shortcut-icon-2.5.2.ico"
 $logPath = Join-Path $env:TEMP "codex-switcher-launch.log"
 
 function Show-LaunchError($message) {
@@ -37,19 +37,35 @@ function Import-WindowsProxy {
   } catch {}
 }
 
-try {
-  if (-not (Test-Path -LiteralPath $appRoot)) {
-    Show-LaunchError "Cannot find Codex Switcher app folder:`n$appRoot"
-    exit 1
+function Update-DesktopShortcut {
+  if (-not (Test-Path -LiteralPath $shortcutIcon)) {
+    return
   }
+  $desktop = [Environment]::GetFolderPath("Desktop")
+  $shortcutPath = Join-Path $desktop "Codex Switcher.lnk"
+  $retiredShortcut = Join-Path $desktop "Secure Codex Switcher.lnk"
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcut = $shell.CreateShortcut($shortcutPath)
+  $shortcut.TargetPath = $packagedExe
+  $shortcut.WorkingDirectory = Split-Path -Parent $packagedExe
+  $shortcut.IconLocation = "$shortcutIcon,0"
+  $shortcut.Arguments = ""
+  $shortcut.Save()
+  if (Test-Path -LiteralPath $retiredShortcut) {
+    Remove-Item -LiteralPath $retiredShortcut -Force
+  }
+  Start-Process -FilePath "$env:SystemRoot\System32\ie4uinit.exe" -ArgumentList "-show" -WindowStyle Hidden -ErrorAction SilentlyContinue
+}
 
-  if (-not (Test-Path -LiteralPath $electronExe)) {
-    Show-LaunchError "Cannot find Electron runtime:`n$electronExe`n`nPlease run npm install in the app folder."
+try {
+  if (-not (Test-Path -LiteralPath $packagedExe)) {
+    Show-LaunchError "Cannot find the packaged application:`n$packagedExe`n`nRun npm run package:dir in the project folder."
     exit 1
   }
 
   Import-WindowsProxy
-  Start-Process -FilePath $electronExe -ArgumentList "`"$appRoot`"" -WorkingDirectory $appRoot
+  Update-DesktopShortcut
+  Start-Process -FilePath $packagedExe -WorkingDirectory (Split-Path -Parent $packagedExe)
 } catch {
   Add-Content -Path $logPath -Value "$(Get-Date -Format o) $($_.Exception.Message)"
   Show-LaunchError "Error launching Codex Switcher:`n$($_.Exception.Message)`n`nLog: $logPath"

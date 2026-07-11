@@ -1,319 +1,215 @@
 # Secure Codex Switcher for Windows
 
-A local-only Windows GUI for managing multiple official Codex / ChatGPT auth files, checking usage, and switching accounts with encrypted storage.
+[中文说明](README.zh-CN.md)
 
-[中文说明](./README.zh-CN.md)
+Secure Codex Switcher is an independent, local-only Windows desktop application for managing multiple ChatGPT Codex sign-ins, monitoring quota snapshots, and switching accounts without storing credentials in plaintext.
 
-This project is designed for users who already use the official Codex app or CLI and want a safer local account switcher. It does not provide or bypass OpenAI login. Login still happens through official Codex.
+> This project is not affiliated with, endorsed by, or maintained by OpenAI. ChatGPT, Codex, and OpenAI are trademarks of their respective owner.
 
-## Versions
+## Release
 
-- `v1.1`: resizable account/detail panes, polished responsive account cards, HTTP-only mode documentation, and safer auto-switch deferral.
-- `v2.1`: queued auto-switch. When Codex is running, the Switcher queues the target account, checks every 15 seconds, and completes the switch after Codex exits.
-- `v2.2`: activity-aware auto-switch. The Switcher waits only when a Codex conversation or task appears active; if Codex is open but idle, the queued switch can complete.
-- `v2.3.0`: dedicated local token-usage dashboard with selected-date 7-day charts, daily cache-hit bars, synchronized refresh cadence, and bilingual documentation.
-- `v2.3.1`: date picker fix for the usage dashboard. Stats date selection now uses only the calendar icon and refreshes the maximum selectable date whenever the picker opens.
-- `v2.3.2`: stability fixes. Auto-switch waits for 90 seconds of continuous quiet time after detected activity; transient main-process network disconnects are logged and shown as UI status instead of fatal dialogs; 401 usage-refresh failures are reported as login-refresh-needed states; usage dates follow today unless the user manually selected a historical date.
+- Current release: **v2.15.0**
+- Platform: Windows x64
+- Desktop runtime: Electron
+- Credential protection: Windows DPAPI
+- Upstream application name: **ChatGPT Codex**
 
-## Features
+Download the installer from the [GitHub Releases](https://github.com/fbpuff/secure-codex-switcher-win/releases) page and verify it against `SHA256SUMS.txt`.
 
-- Windows GUI for importing, viewing, refreshing, switching, and deleting local Codex accounts.
-- Stores imported auth JSON with Windows DPAPI `CurrentUser` encryption.
-- Writes `%USERPROFILE%\.codex\auth.json` atomically when switching.
-- Backs up the previous auth file with DPAPI encryption, not plaintext.
-- Closes official Codex processes before switching or deleting the current account.
-- Can automatically reopen official Codex after a switch.
-- Supports current nested Codex auth format under `tokens`.
-- Refreshes usage while the GUI is open and shows 5-hour / 7-day quota windows when the upstream endpoint allows it.
-- Shows low-quota warnings and can switch automatically only when the current account is exhausted.
-- Uses activity-aware queued auto-switching so active or just-finished Codex conversations are not interrupted by automatic account changes.
-- Provides a dedicated `Usage / 用量` dashboard for local token totals and cache-hit trends from Codex rollout logs.
-- Supports minimize-to-tray and configurable close behavior.
+## Highlights
 
-## Security Model
+- Import and manage multiple ChatGPT Codex login states.
+- Encrypt saved authentication records with Windows DPAPI.
+- Show current 5-hour and 7-day quota snapshots and expected reset times.
+- Rank usable accounts with a transparent availability formula.
+- Choose a one-time next switch account or use automatic best-account selection.
+- Fall back to the best usable account when the selected target is unavailable.
+- Queue automatic switching while a Codex task is active.
+- Detect `task_started` and `task_complete` lifecycle events before closing ChatGPT Codex.
+- Preserve account-list selection and scroll position during refresh.
+- Provide local daily and weekly Token reports with model and reasoning-effort dimensions.
+- Support English and Simplified Chinese UI and documentation.
+- Minimize to tray and use packaged product icons throughout the application.
 
-The project intentionally keeps the attack surface small:
+## Installation
 
-- No local HTTP server.
-- No plugin system.
-- No remote UI content.
-- No embedded OAuth webview.
-- No plaintext account store.
-- No plaintext auth backups.
-- Renderer access is limited to a small Electron IPC allowlist.
-- Logs and UI text do not print raw access tokens or refresh tokens.
-- Runtime account data is ignored by Git with `.gitignore`.
+1. Download `Secure Codex Switcher-2.15.0-x64.exe` from the release page.
+2. Compare its SHA-256 value with `SHA256SUMS.txt`.
+3. Run the installer and choose an installation directory.
+4. Start **Codex Switcher** from the desktop or Start menu.
+5. Sign in to ChatGPT Codex normally before importing the current account.
 
-Compared with simpler or earlier account-switcher approaches, this version avoids several common weaknesses:
-
-- Plaintext token storage is replaced with Windows DPAPI encryption.
-- Plaintext backup files are replaced with encrypted `.dpapi` backups.
-- Switching is guarded by process shutdown so official Codex does not keep using a stale in-memory auth state.
-- The app supports both legacy top-level token auth and newer nested `tokens` auth.
-- Usage refresh failures are treated as status information, not as a reason to expose token data.
-- The GUI has no network-capable renderer; usage requests happen from the main process.
-
-This is still a local tool that handles sensitive auth material. Do not upload your `%USERPROFILE%\.codex\auth.json`, app data folder, `.dpapi` backup files, or screenshots showing full account identifiers.
-
-## Requirements
-
-- Windows 10 or Windows 11.
-- Node.js 22.12 or newer with npm.
-- Git, or GitHub Desktop, or the ability to download this repository as a ZIP.
-- Official Codex app/CLI installed and able to create `%USERPROFILE%\.codex\auth.json`.
-
-## Install From GitHub
-
-Clone the repository:
-
-```powershell
-git clone https://github.com/<your-org-or-username>/secure-codex-switcher-win.git
-cd secure-codex-switcher-win
-```
-
-Run the installer script:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-CodexSwitcher.ps1
-```
-
-The script will:
-
-- install npm dependencies in `secure-codex-switcher-win`;
-- run the test suite;
-- create a desktop shortcut named `Codex Switcher`.
-
-After that, launch it from the desktop shortcut or run:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Start-CodexSwitcher.ps1
-```
-
-## Manual Run
-
-```powershell
-cd .\secure-codex-switcher-win
-npm install
-npm test
-npm start
-```
-
-## First Account
-
-The GUI imports the official Codex auth file at:
-
-```text
-%USERPROFILE%\.codex\auth.json
-```
-
-First-time flow:
-
-1. Open official Codex or run `codex` in PowerShell.
-2. Complete the official ChatGPT/Codex login flow.
-3. Confirm `%USERPROFILE%\.codex\auth.json` exists.
-4. Open Codex Switcher.
-5. Click `导入/新增当前`.
-
-If official Codex asks for an auth method, choose the ChatGPT/Codex login flow rather than API-key-only mode.
-
-## Add Another Account
-
-1. Use official Codex to log out or switch to another ChatGPT/Codex account.
-2. Confirm `%USERPROFILE%\.codex\auth.json` now belongs to that account.
-3. Return to Codex Switcher.
-4. Click `导入/新增当前`.
-
-The account will be added as a separate encrypted local record, or updated if it was already imported.
-
-Browser login alone is not enough. The Switcher imports the auth file created by official Codex; it does not read browser cookies.
-
-## Switching Accounts
-
-When you switch accounts, the app:
-
-1. closes official Codex processes;
-2. creates an encrypted backup of the current auth file;
-3. writes the selected account to `%USERPROFILE%\.codex\auth.json`;
-4. marks the selected account as current;
-5. attempts to reopen official Codex.
-
-Deleting a non-current account only removes the local encrypted Switcher record.
-
-Deleting the current account offers two paths:
-
-- switch to an existing imported account;
-- clear the current auth and reopen official Codex so you can log in to a new account.
-
-## Usage Refresh
-
-Usage refresh calls ChatGPT/Codex usage endpoints. These endpoints are not a stable public API, so usage display can fail even when account switching still works.
-
-Refresh behavior:
-
-- `导入/新增当前` refreshes the imported account once.
-- `刷新全部` refreshes all accounts immediately.
-- Per-account `刷新` refreshes one account.
-- While the GUI is open, all accounts refresh every 5 minutes.
-- Low-quota warning appears at 15% remaining or below.
-- Auto-switch only triggers when the current account is exhausted, and it waits for 90 seconds of continuous quiet time after detected Codex activity.
-- Local token usage stats refresh on the same interval as account usage refresh while the GUI is open.
-
-Common failures:
-
-- `401`: the saved login state was rejected. Switch to that account, reopen official Codex, let it refresh auth, then try again. If it still fails, log in again and re-import.
-- `403`: account switching may still work, but the non-public usage endpoint refused usage display.
-- Network timeout: start your proxy/VPN, then refresh again.
-
-The launcher reads `HTTP_PROXY`, `HTTPS_PROXY`, and Windows user proxy settings.
-
-## Local Token Usage Dashboard
-
-The left rail includes a dedicated `Usage / 用量` page above `Settings / 设置`.
-
-The dashboard shows:
-
-- `Selected Day`, `Last 7 Days`, and `This Month` local token totals.
-- Average cache-hit rate for the selected 7-day window, calculated as `cached_input_tokens / input_tokens`.
-- A calendar-icon stats date picker. Selecting a date shows that day plus the previous 6 calendar days.
-- The picker refreshes its maximum selectable date each time it opens, so the current day remains selectable even if the app stays open across midnight.
-- If the user has not manually selected a historical date, the usage page follows today whenever it refreshes or is reopened. After a historical date is selected, that date is kept until the user selects today again.
-- Daily token usage bars for the selected 7-day window. The highest day is 100%, and other days scale proportionally.
-- Daily cache-hit-rate bars for the same selected 7-day window.
-
-Data source:
-
-- `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`
-- `%USERPROFILE%\.codex\archived_sessions\**\rollout-*.jsonl`
-
-The parser reads only:
-
-- `timestamp`
-- `payload.info.last_token_usage`
-
-It does not display conversation text.
-
-Accuracy boundary:
-
-- These stats are real summaries of local Codex rollout records that contain `last_token_usage`.
-- They are not OpenAI billing data.
-- They do not include usage from other devices or deleted logs.
-- They are not split by account because current Codex rollout usage events do not expose a stable account ID.
-
-## HTTP-only Mode
-
-`Settings -> Network -> HTTP-only mode` switches official Codex from WebSocket transport to the Responses HTTP/SSE transport by selecting a dedicated custom provider with `supports_websockets = false`.
-
-Changing this setting:
-
-1. fully closes official Codex;
-2. migrates the `model_provider` tag in active and archived rollout metadata;
-3. updates the matching provider column in `state_*.sqlite`;
-4. writes or removes the Switcher-managed block in `%USERPROFILE%\.codex\config.toml`;
-5. reopens Codex only if it was running before the change.
-
-History migration is necessary because Codex filters its sidebar by `model_provider`. Without migration, old threads are not deleted, but they can appear missing after selecting a custom provider.
-
-Safety measures:
-
-- rollout files are replaced atomically and only their first metadata line is changed;
-- SQLite updates use a transaction;
-- SQLite backups and a reversible provider manifest are stored under `%USERPROFILE%\.codex\secure-switcher-history-backups`;
-- the managed config block is reversible and restores the previous top-level `model_provider`;
-- no auth token, API key, or conversation body is written to the migration manifest.
-
-## Settings and Window Exit
-
-Open `设置 / Settings` from the left rail to change:
-
-- UI language.
-- Color theme: follow system, light, or dark.
-- Usage auto-refresh interval.
-- Low-quota warning.
-- Auto-switch when the current account is exhausted.
-- Manual switch confirmation.
-- HTTP-only transport for unstable WebSocket proxy environments.
-- Window close behavior: ask every time, minimize to taskbar, minimize to tray, or quit.
-- Open the `%USERPROFILE%\.codex` folder.
-- Fully quit the Switcher app.
-
-Current UI direction:
-
-- Account management and settings are separate views, so the account search/list UI does not overlap the settings page.
-- The left rail only keeps account navigation and settings navigation. The `.codex` folder opener lives inside `设置 / Settings -> 应用 / App`.
-- The left rail includes a separate `Usage / 用量` page for token charts, placed above settings.
-- Low-quota warning and auto-switch controls are grouped vertically in one compact account-page control.
-- Color theme uses a three-option segmented control instead of a dropdown.
-- Selecting an account now updates only the selected row state and the detail panel, so the left account list keeps its scroll position instead of jumping back to the top.
-
-Close behavior:
-
-- On first close, the app asks whether to minimize or quit. If you choose `Always use this action`, the choice is saved locally in `settings.json`.
-- If close behavior is set to `Minimize window`, clicking the window close button minimizes the app.
-- If close behavior is set to `Minimize to tray`, clicking the window close button hides the app from the taskbar and keeps a tray icon. Click or double-click the tray icon to restore the window.
-- To fully quit after minimizing, either use `设置 / Settings -> 应用 / App -> 退出应用 / Quit App`, or right-click the minimized taskbar window and choose `关闭窗口 / Close window`.
-- To fully quit after minimizing to tray, use the tray menu `退出应用 / Quit App` or the Settings page quit button.
-- No account tokens or API keys are stored in settings.
-
-Relevant implementation paths:
-
-- Main close/quit behavior: `secure-codex-switcher-win/src/main.js`.
-- Renderer IPC allowlist for quit: `secure-codex-switcher-win/src/preload.cjs`.
-- Auto-switch quiet-period decision: `secure-codex-switcher-win/src/core/activity-switching.js`.
-- Main-process network error classification: `secure-codex-switcher-win/src/core/main-errors.js`.
-- Usage-refresh error classification: `secure-codex-switcher-win/src/core/refresh-status.js`.
-- Usage-date follow-today logic: `secure-codex-switcher-win/src/core/usage-date.js`.
-- Settings UI and event handling: `secure-codex-switcher-win/src/renderer/index.html` and `secure-codex-switcher-win/src/renderer/app.js`.
-- Settings, usage charts, and theme styles: `secure-codex-switcher-win/src/renderer/styles.css`.
-- HTTP-only config management: `secure-codex-switcher-win/src/core/codex-config.js`.
-- History provider migration: `secure-codex-switcher-win/src/core/codex-history.js`.
-
-## Can Others Install Directly From This Repository?
-
-Yes, if they are on Windows and have Node.js 22.12 or newer with npm installed. The repository contains the source code, launcher, installer script, tests, and dependency lockfile.
-
-It is not currently a signed `.exe` installer. Users install it from source with the PowerShell script above. This keeps the distribution transparent: dependencies are installed from `package-lock.json`, and the app can be inspected before running.
-
-## About a Single EXE Build
-
-Bundling this project into a single Windows installer or executable is not automatically less secure. The security model can remain the same if the package contains only the app code and runtime dependencies.
-
-The risks move to distribution and supply chain:
-
-- the release artifact should be built from a clean checkout;
-- runtime data such as `auth.json`, `accounts-store.json`, `.dpapi` backups, and `.env` files must never be bundled;
-- the build should use a lockfile and reproducible steps;
-- users should be able to verify the source commit used for a release;
-- production releases should ideally be code-signed;
-- auto-update, if added later, needs signature verification.
-
-For now, source installation is the safer transparent default for a public project. A signed installer can be added later without changing the local security model.
+The installer does not delete local application data during uninstall by default.
 
 ## Development
 
+Requirements:
+
+- Windows 10 or Windows 11
+- Node.js 22.19 or later
+- npm
+
 ```powershell
-cd .\secure-codex-switcher-win
 npm install
 npm test
-npm run audit:prod
 npm start
 ```
 
-## Repository Hygiene
+Build the Windows installer:
 
-The repository is configured to ignore runtime and secret-bearing files:
+```powershell
+npm run package:win
+```
 
-- `node_modules/`
-- `auth.json`
-- `accounts-store.json`
-- `settings.json`
-- `*.dpapi`
-- `.env`
-- `secure-switcher-backups/`
+Generated packages are written to `dist/` and are excluded from Git.
+
+## Account Import And Storage
+
+The application reads the current ChatGPT Codex authentication file only when the user requests an import or when it needs to synchronize a saved current account. Imported authentication JSON is encrypted before it is written to the Switcher account store.
+
+- Encryption uses Windows DPAPI under the current Windows user profile.
+- Saved records are intended to be decryptable only by the same Windows user on the same Windows installation.
+- Plaintext auth backups are migrated to DPAPI-protected files.
+- Tokens, complete account identifiers, and auth JSON are never written to diagnostic logs.
+- Runtime account data is not included in the source tree or release package.
+
+This protects data at rest from casual file access. It does not protect against malware or another process already running with the same Windows user privileges.
+
+## Switching Behavior
+
+Manual switching:
+
+1. The Switcher validates the target account and reads its encrypted auth record.
+2. It closes official ChatGPT Codex processes.
+3. It verifies that closure completed before replacing authentication.
+4. It writes the selected auth state atomically.
+5. It reopens ChatGPT Codex when appropriate.
+
+If ChatGPT Codex cannot be closed completely, authentication replacement is cancelled to prevent a false or partial switch.
+
+Automatic switching:
+
+- Triggers when a known current-account quota window is exhausted.
+- A manually selected next account is a **one-time preference**.
+- The preference is consumed after the next automatic switch attempt.
+- Missing, unreadable, stale, current, or quota-blocked targets fall back to a usable scored account.
+- If no usable account exists, the Switcher waits instead of changing auth prematurely.
+
+## Active Task Protection
+
+Automatic switching must not interrupt unfinished Codex work. The Switcher combines three local signals:
+
+1. Live official ChatGPT Codex process records.
+2. Recent local rollout activity.
+3. Rollout lifecycle events, where an unmatched `task_started` remains busy until `task_complete` appears.
+
+An active or uncertain task keeps switching queued. File silence alone is not treated as proof that a task finished. User-confirmed manual switching remains available.
+
+## Quota And Ranking
+
+Quota percentages come from the ChatGPT/Codex usage endpoint available to the current login. They are snapshots, not locally counted Token totals.
+
+Account availability is a local decision score:
+
+```text
+availability = minimum remaining quota * 60%
+             + 5-hour remaining quota * 20%
+             + 7-day remaining quota * 20%
+```
+
+Rules:
+
+- Full known quotas score 100.
+- If only one quota window is known, that remaining percentage is used directly.
+- An exhausted known window makes the account unavailable for immediate automatic switching.
+- Reset time is used only to order equal or blocked candidates; it does not inflate immediate availability.
+- Login failures, unreadable records, and stale quota snapshots are excluded from automatic selection.
+
+This score is not an official OpenAI metric.
+
+## Token Usage And Reports
+
+The usage dashboard reads local Codex rollout metadata and aggregates Token events without storing prompt or response content.
+
+Available views include:
+
+- Daily and seven-day Token totals.
+- Input, cached input, output, and reasoning Token composition.
+- Per-account attributed Token totals.
+- Model and reasoning-effort breakdowns.
+- Daily and weekly reports.
+- Observed quota reset history.
+- Capacity estimates derived from unambiguous observed quota changes.
+
+Attribution is evidence-based. Periods that cannot be assigned to exactly one account remain **unattributed**. Capacity estimates are observations, not official plan limits.
+
+Official quota percentages and local rollout Token totals use different data sources and should not be expected to match exactly.
+
+## Refresh And Performance
+
+- The refresh interval is configurable from 1 to 60 minutes.
+- Manual refresh remains available at any time.
+- Background refresh performs one renderer commit per cycle.
+- Account refresh does not rebuild unrelated usage and report views.
+- Non-urgent updates wait briefly while the account panes are actively scrolling.
+- Selection and both pane scroll positions are preserved.
+
+## Network And HTTP-Only Mode
+
+The application uses the operating environment's normal proxy settings. HTTP-only mode can be configured globally or per account for ChatGPT Codex transport compatibility. Changing transport may close and reopen ChatGPT Codex because provider tags and local configuration must remain consistent.
+
+No custom remote telemetry, analytics service, or shared OpenSpec store is enabled by this project.
+
+## Local Files And Privacy
+
+Runtime data is stored under Electron's per-user application data directory. Exact locations depend on Windows and installation context.
+
+The repository excludes:
+
+- Auth files and DPAPI blobs.
+- Account stores and settings.
+- Token caches and usage observations.
+- Codex sessions and process-manager data.
+- Logs, reports, backups, databases, archives, and temporary files.
+- Installers and unpacked build output.
 
 Before publishing changes, run:
 
 ```powershell
-git status --short
+git status
+git diff --cached
 npm test
-npm run audit:prod
+npm audit --omit=dev
 ```
+
+Never commit runtime files copied from a real user profile.
+
+## Troubleshooting
+
+### The displayed quota differs from ChatGPT Codex
+
+Refresh both applications. The Switcher displays the latest successful usage snapshot, while ChatGPT Codex may refresh at a different time.
+
+### Automatic switching is waiting
+
+An active or uncertain Codex task, a recent activity quiet period, or the absence of a usable target can keep switching queued. Finish the task or use a confirmed manual switch.
+
+### The selected next account disappeared
+
+The saved record may have been deleted, replaced, become current, or become unreadable. The one-time preference is cleared and selection returns to the best usable account.
+
+### ChatGPT Codex did not restart
+
+Check whether official Codex processes could be fully closed and whether the installed ChatGPT Codex application is discoverable. Authentication is not replaced when safe closure cannot be verified.
+
+### Reports show unattributed usage
+
+The local evidence did not identify exactly one active account for that interval. The application intentionally avoids guessing.
+
+## Scope
+
+This release targets one local Windows user and the installed ChatGPT Codex desktop application. It is not a cloud account manager, does not synchronize credentials between machines, and does not bypass OpenAI limits or authentication controls.
+
+## License
+
+No license file is currently included. Unless a license is added, copyright law reserves reuse and redistribution rights.

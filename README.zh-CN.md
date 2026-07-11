@@ -1,317 +1,215 @@
-# Secure Codex Switcher for Windows
+# Windows 版 Secure Codex Switcher
 
-一个本地优先的 Windows 图形界面工具，用来管理多个官方 Codex / ChatGPT 登录态，查看用量，并在账号之间切换。账号数据使用 Windows DPAPI 加密保存。
+[English README](README.md)
 
-[English README](./README.md)
+Secure Codex Switcher 是一个独立、仅在本机运行的 Windows 桌面程序，用于管理多个 ChatGPT Codex 登录状态、查看额度快照，并在不明文保存凭据的前提下切换账号。
 
-这个项目适合已经使用官方 Codex 应用或 CLI 的用户。它不会提供或绕过 OpenAI 登录流程，登录仍然由官方 Codex 完成。
+> 本项目不是 OpenAI 官方项目，也未获得 OpenAI 的认可或维护。ChatGPT、Codex 和 OpenAI 是其各自权利人的商标。
 
-## 版本
+## 发布版本
 
-- `v1.1`：账号列表和详情面板可调宽度，优化响应式账号卡片，补充 HTTP-only 模式文档，并改进自动切换延迟策略。
-- `v2.1`：排队式自动切换。Codex 正在运行时会排队目标账号，每 15 秒检查一次，等 Codex 退出后完成切换。
-- `v2.2`：基于对话活动的自动切换。只有检测到 Codex 对话或任务仍活跃时才等待；如果 Codex 打开但空闲，排队切换可以继续完成。
-- `v2.3.0`：新增独立本地 token 用量页面，支持选择统计日期、7 天每日用量横条图、7 天每日缓存命中率横条图、与账号余量一致的刷新节奏，以及中英文文档。
-- `v2.3.1`：修复用量页面日期选择器。统计日期现在只通过日历图标选择，并且每次打开日历前都会刷新最大可选日期。
-- `v2.3.2`：稳定性修复。自动切换在检测到对话活动后会等待 90 秒连续空闲再切换；后台网络断连会记录日志并在界面提示，不再弹出主进程错误；401 用量刷新失败会明确提示需要刷新登录态；用量日期在未手动选择历史日期时会自动跟随今天。
+- 当前版本：**v2.15.0**
+- 平台：Windows x64
+- 桌面运行时：Electron
+- 凭据保护：Windows DPAPI
+- 上游软件名称：**ChatGPT Codex**
 
-## 功能
+请从 [GitHub Releases](https://github.com/fbpuff/secure-codex-switcher-win/releases) 下载，并使用 `SHA256SUMS.txt` 校验安装包。
 
-- Windows GUI：导入、查看、刷新、切换和删除本地 Codex 账号。
-- 使用 Windows DPAPI `CurrentUser` 加密保存导入的 auth JSON。
-- 切换账号时原子写入 `%USERPROFILE%\.codex\auth.json`。
-- 切换前会把旧 auth 文件做 DPAPI 加密备份，而不是明文备份。
-- 切换或删除当前账号前会关闭官方 Codex 进程，避免旧登录态仍留在内存中。
-- 切换后可以自动重新打开官方 Codex。
-- 支持新版 Codex `tokens` 嵌套 auth 结构。
-- GUI 打开时会定时刷新用量，并在接口允许时显示 5 小时 / 7 天窗口。
-- 支持低余量提醒；自动切换只会在当前账号用尽时触发。
-- 自动切换具备活动感知排队能力，不会在 Codex 对话或任务仍活跃或刚结束时强行自动切换。
-- 提供独立 `用量 / Usage` 页面，从 Codex 本地 rollout 日志统计 token 总量和缓存命中率趋势。
-- 支持最小化到托盘和可配置关闭行为。
-- GUI 支持中文和英文，选择会保存到本地设置。
+## 主要功能
 
-## 安全模型
+- 导入并管理多个 ChatGPT Codex 登录状态。
+- 使用 Windows DPAPI 加密保存认证记录。
+- 显示 5 小时和 7 天额度快照及预计重置时间。
+- 使用透明公式对可用账号进行排序。
+- 可指定一次性的下次切换账号，也可默认选择最高评分账号。
+- 指定账号不可用时自动回退到评分最高的可用账号。
+- Codex 任务运行期间将自动切换保持为排队状态。
+- 解析 `task_started` 和 `task_complete` 生命周期事件，避免误关 ChatGPT Codex。
+- 刷新时保留账号选择和滚动位置。
+- 提供本地每日、每周 Token 报告，并支持模型与思考强度维度。
+- 提供简体中文、英文界面及对应文档。
+- 支持最小化到托盘，并在程序内外统一使用产品图标。
 
-这个项目刻意压低攻击面：
+## 安装
 
-- 没有本地 HTTP server。
-- 没有插件系统。
-- 没有远程 UI 内容。
-- 没有内嵌 OAuth webview。
-- 没有明文账号 store。
-- 没有明文 auth 备份。
-- Renderer 只能通过很小的 Electron IPC allowlist 调用主进程。
-- 日志和界面不会打印原始 access token / refresh token。
-- 运行态账号文件已经通过 `.gitignore` 排除。
+1. 从 Release 页面下载 `Secure Codex Switcher-2.15.0-x64.exe`。
+2. 与 `SHA256SUMS.txt` 中的 SHA-256 值进行比较。
+3. 运行安装程序并选择安装目录。
+4. 从桌面或开始菜单启动 **Codex Switcher**。
+5. 先在 ChatGPT Codex 中正常登录，再导入当前账号。
 
-相比一些简单账号切换器或早期方案，这个版本主要加强在：
+默认卸载行为不会删除本地应用数据。
 
-- 明文 token 存储改为 DPAPI 加密。
-- 明文备份改为 `.dpapi` 加密备份。
-- 切换前关闭官方 Codex，避免旧登录态残留。
-- 同时支持旧版顶层 token 和新版 `tokens` 嵌套结构。
-- 用量刷新失败只作为状态显示，不会暴露 token。
-- GUI renderer 不直接发起网络请求；用量请求在主进程中执行。
+## 开发运行
 
-它仍然是一个会处理敏感 auth 材料的本地工具。不要上传你的 `%USERPROFILE%\.codex\auth.json`、应用数据目录、`.dpapi` 备份文件，或包含完整账号标识的截图。
+要求：
 
-## 安装要求
-
-- Windows 10 或 Windows 11。
-- Node.js 22.12 或更高版本，以及 npm。
-- Git，或 GitHub Desktop，或能下载仓库 ZIP。
-- 已安装官方 Codex 应用/CLI，并能生成 `%USERPROFILE%\.codex\auth.json`。
-
-## 从 GitHub 安装
-
-克隆仓库：
+- Windows 10 或 Windows 11
+- Node.js 22.19 或更高版本
+- npm
 
 ```powershell
-git clone https://github.com/<your-org-or-username>/secure-codex-switcher-win.git
-cd secure-codex-switcher-win
-```
-
-运行安装脚本：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-CodexSwitcher.ps1
-```
-
-脚本会：
-
-- 在 `secure-codex-switcher-win` 中安装 npm 依赖；
-- 运行测试；
-- 创建桌面快捷方式 `Codex Switcher`。
-
-之后可以双击桌面图标启动，或运行：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Start-CodexSwitcher.ps1
-```
-
-## 手动运行
-
-```powershell
-cd .\secure-codex-switcher-win
 npm install
 npm test
 npm start
 ```
 
-## 导入第一个账号
+构建 Windows 安装包：
 
-GUI 会导入官方 Codex 的 auth 文件：
+```powershell
+npm run package:win
+```
+
+生成结果位于 `dist/`，该目录不会提交到 Git。
+
+## 账号导入与存储
+
+只有在用户请求导入或同步当前已保存账号时，程序才读取 ChatGPT Codex 当前认证文件。导入的认证 JSON 会先加密，再写入 Switcher 的账号存储。
+
+- 使用当前 Windows 用户上下文下的 DPAPI 加密。
+- 保存记录原则上只能由同一 Windows 安装中的同一用户解密。
+- 旧的明文认证备份会迁移为 DPAPI 保护文件。
+- Token、完整账号标识和认证 JSON 不会写入诊断日志。
+- 运行时账号数据不会进入源码仓库或安装包。
+
+DPAPI 可以降低文件被直接读取的风险，但不能防御已使用同一 Windows 用户权限运行的恶意程序。
+
+## 切换行为
+
+手动切换流程：
+
+1. 验证目标账号并读取其加密认证记录。
+2. 关闭官方 ChatGPT Codex 进程。
+3. 确认进程已完全关闭后才替换认证。
+4. 原子写入目标认证状态。
+5. 在适当情况下重新打开 ChatGPT Codex。
+
+如果无法确认 ChatGPT Codex 已完全关闭，程序会取消认证替换，避免出现“界面像是切换了、实际账号没有变化”的假切换。
+
+自动切换规则：
+
+- 当前账号任一已知额度窗口耗尽时触发。
+- 手动指定的下次账号是**一次性偏好**。
+- 下一次自动切换尝试后，该偏好会被清除。
+- 目标缺失、不可读取、数据过期、已经成为当前账号或额度不可用时，回退到可用的评分账号。
+- 没有可用账号时继续等待，不提前替换认证。
+
+## 活跃任务保护
+
+自动切换不能中断尚未完成的 Codex 工作。程序组合使用三个本地信号：
+
+1. 官方 ChatGPT Codex 活跃进程记录。
+2. 最近的本地 rollout 写入活动。
+3. rollout 生命周期事件：出现 `task_started` 后，必须等到 `task_complete` 才视为完成。
+
+任务活跃或状态无法确定时，自动切换会继续排队。仅仅一段时间没有文件写入，不再被当作任务结束的证据。用户仍可主动确认手动切换。
+
+## 额度与评分
+
+额度百分比来自当前登录可访问的 ChatGPT/Codex usage 接口，属于上游额度快照，不是本地统计得到的 Token 总量。
+
+账号可用度采用本地决策公式：
 
 ```text
-%USERPROFILE%\.codex\auth.json
+可用度 = 最低剩余额度 × 60%
+       + 5 小时剩余额度 × 20%
+       + 7 天剩余额度 × 20%
 ```
 
-首次使用流程：
+规则：
 
-1. 打开官方 Codex，或在 PowerShell 里运行 `codex`。
-2. 按官方流程完成 ChatGPT/Codex 登录。
-3. 确认 `%USERPROFILE%\.codex\auth.json` 已存在。
-4. 打开 Codex Switcher。
-5. 点击 `导入/新增当前`。
+- 两个已知额度均为满额时得 100 分。
+- 只有一个额度可用时，直接使用该额度的剩余百分比。
+- 任一已知额度耗尽时，该账号不能作为立即自动切换目标。
+- 重置时间只用于同分账号或受限账号排序，不会抬高即时可用度。
+- 登录异常、记录不可读和额度快照过期的账号不会参与自动选择。
 
-如果官方 Codex 询问 auth method，选择 ChatGPT/Codex 登录，不要选择纯 API key 模式。
+该分数不是 OpenAI 官方指标。
 
-## 添加另一个账号
+## Token 用量与报告
 
-1. 在官方 Codex 里退出或切换到另一个 ChatGPT/Codex 账号。
-2. 确认 `%USERPROFILE%\.codex\auth.json` 已变成新账号。
-3. 回到 Codex Switcher。
-4. 点击 `导入/新增当前`。
+用量界面读取本地 Codex rollout 元数据并汇总 Token 事件，不保存提示词或回复正文。
 
-浏览器登录本身不够。这个工具只导入官方 Codex 生成的 auth 文件，不读取浏览器 cookie。
+可用内容包括：
 
-## 切换账号
+- 每日和最近 7 天 Token 总量。
+- 输入、缓存输入、输出和推理 Token 组成。
+- 按账号归属的 Token 数量。
+- 按模型和思考强度分类。
+- 每日报告和每周总结。
+- 已观测到的额度重置记录。
+- 根据无歧义额度变化计算的容量估算。
 
-切换时应用会：
+归属逻辑以证据为准。无法唯一对应某个账号的时间段会保留为**未归属用量**。容量估算属于本地观测结果，不是官方套餐限额。
 
-1. 关闭官方 Codex 进程；
-2. DPAPI 加密备份当前 auth 文件；
-3. 把目标账号写入 `%USERPROFILE%\.codex\auth.json`；
-4. 标记目标账号为当前账号；
-5. 尝试重新打开官方 Codex。
+官方额度百分比和本地 rollout Token 总量来自不同数据源，两者不应被认为必须完全一致。
 
-删除非当前账号只会删除本地加密记录，不影响官方 Codex。
+## 刷新与性能
 
-删除当前账号有两种选择：
+- 自动刷新间隔可以设置为 1 至 60 分钟。
+- 随时可以手动刷新。
+- 每轮后台刷新只提交一次界面更新。
+- 账号刷新不会重建无关的用量和报告视图。
+- 用户正在滚动账号面板时，非紧急更新会短暂等待。
+- 当前选中账号和左右面板滚动位置会被保留。
 
-- 切换到一个已经导入的账号；
-- 清除当前 auth 并重新打开官方 Codex，让你登录新账号。
+## 网络与 HTTP-only 模式
 
-## 用量刷新
+程序沿用系统环境中的代理配置。可以为全局或单个账号设置 HTTP-only 模式，以适配 ChatGPT Codex 的传输行为。修改传输模式可能需要关闭并重新打开 ChatGPT Codex，以保证本地配置和历史 provider 标记一致。
 
-用量刷新依赖 ChatGPT/Codex 的用量接口。该接口不是稳定公开 API，所以即使账号切换可用，用量显示也可能失败。
+本项目不启用自定义远程遥测、分析服务或共享 OpenSpec 存储。
 
-刷新行为：
+## 本地文件与隐私
 
-- `导入/新增当前` 会刷新刚导入的账号。
-- `刷新全部` 会立即刷新所有账号。
-- 单个账号的 `刷新` 只刷新该账号。
-- GUI 打开时，每 5 分钟后台刷新一次。
-- 低余量提醒默认在剩余 15% 或以下时显示。
-- 自动切换只在当前账号用尽时触发，并且检测到活动后需要 90 秒连续空闲才会执行。
-- 本地 token 用量统计与账号余量刷新使用相同后台间隔。
+运行时数据保存在 Electron 的当前用户应用数据目录中，具体路径会随 Windows 和安装环境变化。
 
-常见失败：
+仓库明确排除：
 
-- `401`：保存的登录态被用量接口拒绝。切换到该账号，重新打开官方 Codex，让它刷新 auth；仍失败时重新登录并导入。
-- `403`：账号可能仍可切换，但非公开用量接口拒绝显示用量。
-- 网络超时：先启动代理/VPN，再刷新。
+- 认证文件和 DPAPI 密文。
+- 账号存储及设置。
+- Token 缓存和额度观测。
+- Codex 会话和进程管理数据。
+- 日志、报告、备份、数据库、归档和临时文件。
+- 安装程序和解包后的构建目录。
 
-启动脚本会读取 `HTTP_PROXY`、`HTTPS_PROXY` 和 Windows 当前用户代理设置。
-
-## 本地 token 用量页面
-
-左侧导航栏中有独立的 `用量 / Usage` 页面，位置在 `设置 / Settings` 上方。
-
-用量页面包括：
-
-- `选中日`、`近 7 天`、`本月` token 总量。
-- `平均缓存命中率`，口径为选中 7 天窗口内 `cached_input_tokens / input_tokens`。
-- 通过日历图标打开统计日期选择器。选择某一天后，会显示该日和前 6 个自然日，共 7 天。
-- 每次打开日期选择器前都会刷新最大可选日期，即使应用跨天未重启，也能选择当天。
-- 如果用户没有手动选择历史日期，用量页会在刷新或重新进入页面时自动切换到今天；手动选择历史日期后会保留该日期，直到再次选择今天。
-- 左侧横条图显示选中 7 天窗口内每天的 token 总量，最高日为 100%，其他日期等比例缩放。
-- 右侧横条图显示同一个 7 天窗口内每天的缓存命中率，按 0-100% 缩放。
-
-数据来源：
-
-- `%USERPROFILE%\.codex\sessions\**\rollout-*.jsonl`
-- `%USERPROFILE%\.codex\archived_sessions\**\rollout-*.jsonl`
-
-解析器只读取：
-
-- `timestamp`
-- `payload.info.last_token_usage`
-
-不会显示对话正文。
-
-准确性边界：
-
-- 对本机 rollout 日志中存在 `last_token_usage` 的记录，统计是真实汇总，不是估算。
-- 这不是 OpenAI 官方账单，不包含其他设备使用量。
-- 如果 Codex 日志被删除、移动到其他位置，或由未写入 `last_token_usage` 的旧版本生成，对应 token 无法统计。
-- 当前不能稳定按账号拆分，因为 Codex rollout usage 事件没有稳定账号 ID。
-
-## HTTP-only 模式
-
-在 `设置 -> 网络连接 -> HTTP-only 模式` 中，可以让官方 Codex 使用 Responses HTTP/SSE 传输，并通过独立的自定义 provider 设置 `supports_websockets = false`，减少代理环境下 WebSocket 反复 reconnect 的情况。
-
-修改此设置时，Switcher 会：
-
-1. 完全关闭官方 Codex；
-2. 迁移活动和归档 rollout 元数据中的 `model_provider`；
-3. 更新 `state_*.sqlite` 中对应的 provider 字段；
-4. 写入或移除 `%USERPROFILE%\.codex\config.toml` 中由 Switcher 管理的配置段；
-5. 仅在修改前 Codex 正在运行时自动重新打开。
-
-迁移历史标记是必要步骤，因为 Codex 会按 `model_provider` 过滤侧栏。只修改配置不会删除旧对话，但旧对话可能会像“消失”一样被隐藏。
-
-安全措施：
-
-- rollout 文件采用原子替换，只修改第一行会话元数据；
-- SQLite 修改在事务中完成；
-- SQLite 备份和可恢复迁移清单保存在 `%USERPROFILE%\.codex\secure-switcher-history-backups`；
-- Switcher 管理的配置段可以撤销，并恢复原来的顶层 `model_provider`；
-- 迁移清单不保存 auth token、API key 或对话正文。
-
-## 设置与退出
-
-从左侧栏打开 `设置 / Settings` 可以修改：
-
-- 界面语言。
-- 颜色主题：跟随系统、亮色、暗色。
-- 用量自动刷新间隔。
-- 低余量提醒。
-- 当前账号用尽后的自动切换。
-- 手动切换前确认。
-- 适用于 WebSocket 代理不稳定环境的 HTTP-only 传输。
-- 窗口关闭行为：每次询问、最小化到任务栏、最小化到托盘、退出应用。
-- 打开 `%USERPROFILE%\.codex` 文件夹。
-- 彻底退出 Switcher 应用。
-
-当前界面调整方向：
-
-- 账号管理和设置页拆成独立视图，避免账号搜索框、账号列表遮挡设置内容。
-- 左侧栏保留账号、用量和设置入口；`.codex` 文件夹入口移动到 `设置 -> 应用`。
-- `低余量提醒` 和 `用尽后自动切换` 在账号页中改成上下排列的组合控件。
-- 颜色主题改成三段按钮，不再使用下拉框。
-- 点击选择账号时只更新选中态和右侧详情，不再重建左侧账号列表，因此列表滚动位置不会跳回顶部。
-
-关闭行为：
-
-- 首次关闭窗口时，应用会询问最小化还是退出；如果勾选“以后均保持此操作”，选择会保存到本地 `settings.json`。
-- 如果关闭行为设置为“最小化窗口”，点击窗口关闭按钮会最小化。
-- 如果关闭行为设置为“最小化到托盘”，点击窗口关闭按钮会从任务栏隐藏并保留托盘图标。点击或双击托盘图标可恢复窗口。
-- 最小化后想彻底退出，可以进入 `设置 -> 应用 -> 退出应用`，也可以在任务栏右键窗口并选择 `关闭窗口`。
-- 最小化到托盘后想彻底退出，可以使用托盘菜单 `退出应用`，或进入设置页点击 `退出应用`。
-- `settings.json` 只保存行为配置，不保存账号 token 或 API key。
-
-相关实现路径：
-
-- 主进程关闭/退出逻辑：`secure-codex-switcher-win/src/main.js`。
-- Renderer 退出 IPC allowlist：`secure-codex-switcher-win/src/preload.cjs`。
-- 自动切换空闲等待决策：`secure-codex-switcher-win/src/core/activity-switching.js`。
-- 主进程网络错误分类：`secure-codex-switcher-win/src/core/main-errors.js`。
-- 用量刷新错误分类：`secure-codex-switcher-win/src/core/refresh-status.js`。
-- 用量日期跟随今天逻辑：`secure-codex-switcher-win/src/core/usage-date.js`。
-- 设置页结构和事件：`secure-codex-switcher-win/src/renderer/index.html`、`secure-codex-switcher-win/src/renderer/app.js`。
-- 设置、用量图表和主题样式：`secure-codex-switcher-win/src/renderer/styles.css`。
-- HTTP-only 配置管理：`secure-codex-switcher-win/src/core/codex-config.js`。
-- 历史 provider 迁移：`secure-codex-switcher-win/src/core/codex-history.js`。
-
-## 别人能否直接安装
-
-可以，只要对方是 Windows 且安装了 Node.js 22.12 或更高版本及 npm。仓库里包含源码、启动脚本、安装脚本、测试和依赖锁文件。
-
-目前它不是签名 `.exe` 安装包，而是源码安装。这样更透明：依赖来自 `package-lock.json`，用户可以先审查代码再运行。
-
-## 关于整合成一个 EXE
-
-打包成单个 Windows 安装包或 exe 并不天然更不安全。如果包里只包含应用代码和运行依赖，安全模型可以保持一致。
-
-风险主要转移到分发和供应链：
-
-- release artifact 必须从干净 checkout 构建；
-- 不能把 `auth.json`、`accounts-store.json`、`.dpapi` 备份、`.env` 等运行态数据打进包；
-- 构建应使用锁文件和可复现步骤；
-- 用户应能确认 release 对应的源码 commit；
-- 正式发布最好做代码签名；
-- 如果以后加入自动更新，必须校验更新签名。
-
-所以当前公开项目先保持源码安装，是更透明、更容易审计的方式。后续可以增加签名安装包，而不改变本地安全模型。
-
-## 开发
+公开修改前应运行：
 
 ```powershell
-cd .\secure-codex-switcher-win
-npm install
+git status
+git diff --cached
 npm test
-npm run audit:prod
-npm start
+npm audit --omit=dev
 ```
 
-## 仓库卫生
+不要提交从真实用户目录复制出来的运行时文件。
 
-仓库已经忽略运行态和敏感文件：
+## 故障排查
 
-- `node_modules/`
-- `auth.json`
-- `accounts-store.json`
-- `settings.json`
-- `*.dpapi`
-- `.env`
-- `secure-switcher-backups/`
+### Switcher 与 ChatGPT Codex 的额度不同
 
-发布前建议运行：
+分别刷新两个程序。Switcher 显示最近一次成功获取的额度快照，ChatGPT Codex 可能在不同时间更新。
 
-```powershell
-git status --short
-npm test
-npm run audit:prod
-```
+### 自动切换一直等待
+
+活跃或状态不确定的 Codex 任务、最近活动静默期，或者没有可用目标账号，都会使切换继续排队。可以等待任务完成，或主动确认手动切换。
+
+### 指定的下次账号消失
+
+对应本地记录可能已删除、替换、成为当前账号或无法读取。一次性偏好会被清除，后续恢复为选择评分最高的可用账号。
+
+### ChatGPT Codex 没有重新打开
+
+检查官方 Codex 进程是否能够完全关闭，以及系统能否发现已安装的 ChatGPT Codex。无法验证安全关闭时，认证不会被替换。
+
+### 报告出现未归属用量
+
+本地证据无法将该时间段唯一对应到一个账号。程序会保留未知状态，而不是强行猜测。
+
+## 适用范围
+
+本版本面向单个 Windows 本地用户和已安装的 ChatGPT Codex 桌面应用。它不是云端账号管理器，不会跨设备同步凭据，也不会绕过 OpenAI 的限额或认证机制。
+
+## 许可证
+
+当前仓库没有包含许可证文件。在添加许可证之前，著作权法默认保留复用和再分发权利。

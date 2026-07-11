@@ -1,37 +1,77 @@
 # Dependencies
 node_modules/
-**/node_modules/
 
-# Runtime and local app state
-.codex/
-auth.json
+# Build and packaging output
+dist/
+dist-*/
+build/
+!build/
+build/*
+!build/icon.png
+!build/icon.ico
+!build/shortcut-icon-2.5.2.ico
+!build/tray-icon-2.5.3.png
+release/
+out/
+*.asar
+*.exe
+*.msi
+*.zip
+
+# Local runtime state
 accounts-store.json
 settings.json
-*.dpapi
-secure-switcher-backups/
+token-usage-cache.json
+usage-observations.json
+weekly-usage-reports/
+main-process.log
+*.log
+*.pid
+resume-logs/
 
-# Environment and secrets
+# Secrets and credentials
 .env
 .env.*
-*.pem
+*.local
+secrets/
+secrets.*
+auth.json
+*.dpapi
 *.key
+*.pem
+*.p12
 *.pfx
 
-# Build outputs
-dist/
-out/
-build/
-coverage/
+# Codex/OpenAI local data copies
+.codex/auth.json
+.codex/config.toml
+.codex/sessions/
+.codex/archived_sessions/
+.codex/process_manager/
+.codex/plugins/cache/
+.codex/tmp/
+.codex/*.log
+codex-data/
+sessions/
+archived_sessions/
+process_manager/
+secure-switcher-backups/
+secure-switcher-history-backups/
 
-# Logs and temporary files
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.tmp
+# Private archives and local agent metadata
+.agents/
+docs/conversation-archive/
+conversation-archive/
+*.local-archives/
 
-# OS and editor files
+# OS/editor/cache files
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
 .idea/
+.pytest_cache/
+coverage/
+.nyc_output/
+*.tmp
+*.temp
