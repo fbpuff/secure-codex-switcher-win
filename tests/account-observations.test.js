@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createAccountService } from "../src/services/account-service.js";
+import { createTestAccountService as createAccountService } from "./test-support.js";
 
 test("account service records active-account and quota observations locally", { skip: process.platform !== "win32" }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "switcher-account-observation-"));
@@ -36,29 +36,58 @@ test("account service records active-account and quota observations locally", { 
   assert.equal(listed.usageRefreshAttemptedAt, Math.floor(nowMs / 1000));
 });
 
-test("account service returns and clears weekly local reports", { skip: process.platform !== "win32" }, () => {
+test("account service returns and clears weekly local reports", { skip: process.platform !== "win32" }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "switcher-weekly-report-"));
   const userData = path.join(root, "appdata");
   const codexDir = path.join(root, ".codex");
   fs.mkdirSync(codexDir, { recursive: true });
   const service = createAccountService(userData, { codexDir, nowMs: () => Date.parse("2026-07-13T12:00:00") });
 
-  const report = service.getWeeklyUsageReport();
+  const report = await service.getWeeklyUsageReport();
   assert.equal(report.source, "local_observation");
   assert.equal(report.accounts.length, 0);
-  assert.equal(service.clearUsageObservations().cleared, true);
+  assert.equal((await service.clearUsageObservations()).cleared, true);
   assert.equal(fs.existsSync(path.join(userData, "usage-observations.json")), true);
 });
 
-test("account service returns daily reports without changing weekly reports", { skip: process.platform !== "win32" }, () => {
+test("account service returns daily reports without changing weekly reports", { skip: process.platform !== "win32" }, async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "switcher-daily-report-"));
   const userData = path.join(root, "appdata");
   const codexDir = path.join(root, ".codex");
   fs.mkdirSync(codexDir, { recursive: true });
   const service = createAccountService(userData, { codexDir, nowMs: () => new Date(2026, 6, 11, 12).getTime() });
-  const daily = service.getDailyUsageReport({ date: "2026-07-10" });
-  const weekly = service.getWeeklyUsageReport({ weekStart: "2026-07-06" });
+  const daily = await service.getDailyUsageReport({ date: "2026-07-10" });
+  const weekly = await service.getWeeklyUsageReport({ weekStart: "2026-07-06" });
   assert.equal(daily.mode, "daily");
   assert.equal(weekly.mode, "weekly");
   assert.equal(new Date(daily.startMs).getDate(), 10);
+});
+
+test("refresh-all writes all successful quota observations as one batch", { skip: process.platform !== "win32" }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "switcher-batched-observation-"));
+  const userData = path.join(root, "appdata");
+  const codexDir = path.join(root, ".codex");
+  fs.mkdirSync(codexDir, { recursive: true });
+  let observationWrites = 0;
+  const service = createAccountService(userData, {
+    codexDir,
+    writeObservationState: (...args) => {
+      observationWrites += 1;
+      fs.writeFileSync(args[0], JSON.stringify(args[1]), "utf8");
+    },
+    fetchImpl: async () => new Response(JSON.stringify({
+      rate_limit: { primary_window: { used_percent: 20, limit_window_seconds: 18_000, reset_at: 1_800_000_000 } }
+    }), { status: 200, headers: { "content-type": "application/json" } })
+  });
+  fs.writeFileSync(path.join(codexDir, "auth.json"), JSON.stringify({ access_token: "a", account_id: "account-a" }));
+  service.importCurrentAuth();
+  fs.writeFileSync(path.join(codexDir, "auth.json"), JSON.stringify({ access_token: "b", account_id: "account-b" }));
+  service.importCurrentAuth();
+  observationWrites = 0;
+
+  await service.refreshAllUsage();
+
+  const state = JSON.parse(fs.readFileSync(path.join(userData, "usage-observations.json"), "utf8"));
+  assert.equal(observationWrites, 1);
+  assert.equal(state.quotaSnapshots.length, 2);
 });

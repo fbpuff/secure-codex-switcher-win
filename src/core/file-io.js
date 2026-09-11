@@ -1,22 +1,74 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export function atomicWriteJson(filePath, value) {
-  atomicWriteText(filePath, `${JSON.stringify(value, null, 2)}\n`);
+const ATOMIC_RENAME_RETRIES = 6;
+const ATOMIC_RENAME_DELAY_MS = 25;
+
+export function atomicWriteJson(filePath, value, options = {}) {
+  if (options.backup !== false && fs.existsSync(filePath)) {
+    const current = fs.readFileSync(filePath, "utf8");
+    try {
+      JSON.parse(current);
+      atomicWriteText(`${filePath}.bak`, current);
+    } catch {}
+  }
+  const serialized = options.compact
+    ? JSON.stringify(value)
+    : `${JSON.stringify(value, null, 2)}\n`;
+  atomicWriteText(filePath, serialized);
 }
 
 export function atomicWriteText(filePath, value) {
   const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(tempPath, value, { encoding: "utf8", mode: 0o600 });
-  fs.renameSync(tempPath, filePath);
+  let handle;
+  try {
+    handle = fs.openSync(tempPath, "w", 0o600);
+    fs.writeFileSync(handle, value, "utf8");
+    fs.fsyncSync(handle);
+    fs.closeSync(handle);
+    handle = undefined;
+    renameWithRetry(tempPath, filePath);
+  } finally {
+    if (handle !== undefined) fs.closeSync(handle);
+    fs.rmSync(tempPath, { force: true });
+  }
+}
+
+function renameWithRetry(sourcePath, targetPath) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.renameSync(sourcePath, targetPath);
+      return;
+    } catch (error) {
+      if (!['EPERM', 'EACCES', 'EBUSY'].includes(error?.code) || attempt >= ATOMIC_RENAME_RETRIES) throw error;
+      // Windows readers/AV can hold the destination briefly; bounded retry preserves atomic replacement.
+      const wait = new Int32Array(new SharedArrayBuffer(4));
+      Atomics.wait(wait, 0, 0, ATOMIC_RENAME_DELAY_MS);
+    }
+  }
 }
 
 export function readJsonIfExists(filePath, fallback) {
   if (!fs.existsSync(filePath)) {
     return fallback;
   }
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const primary = fs.readFileSync(filePath, "utf8");
+  try {
+    return JSON.parse(primary);
+  } catch (primaryError) {
+    const backupPath = `${filePath}.bak`;
+    if (!fs.existsSync(backupPath)) throw primaryError;
+    let recovered;
+    try {
+      recovered = JSON.parse(fs.readFileSync(backupPath, "utf8"));
+    } catch {
+      throw primaryError;
+    }
+    fs.renameSync(filePath, `${filePath}.corrupt-${Date.now()}`);
+    atomicWriteText(filePath, `${JSON.stringify(recovered, null, 2)}\n`);
+    return recovered;
+  }
 }
 
 export function findStateDatabases(codexDir) {

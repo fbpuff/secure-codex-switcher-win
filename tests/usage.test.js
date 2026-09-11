@@ -66,15 +66,20 @@ test("summarizes connect timeout as a proxy/network hint", async () => {
   );
 });
 
-test("distinguishes rejected login state from unsupported usage access", async () => {
-  await assert.rejects(
-    () => fetchUsageSnapshot({
+test("distinguishes expired usage authentication from unsupported usage access", async () => {
+  let expired;
+  try {
+    await fetchUsageSnapshot({
       accessToken: "access",
       accountId: "acct",
       fetchImpl: async () => new Response("", { status: 401 })
-    }),
-    /登录态被用量接口拒绝（401）/
-  );
+    });
+  } catch (error) {
+    expired = error;
+  }
+  assert.ok(expired instanceof Error);
+  assert.match(expired.message, /用量认证已过期（401）/);
+  assert.match(expired.message, /账号仍可切换/);
 
   await assert.rejects(
     () => fetchUsageSnapshot({

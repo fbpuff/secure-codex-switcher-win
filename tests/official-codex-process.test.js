@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 import { officialCodexProcessIds, officialCodexProcessScript } from "../src/core/official-codex-process.js";
 
@@ -87,3 +88,121 @@ test("diagnostic process script can explicitly exclude a current official ancest
   const script = officialCodexProcessScript({ mode: "count", currentPid: 123, excludeCurrentTree: true });
   assert.match(script, /\$excluded = CurrentOfficialCodexTreeIds/);
 });
+
+test("activity inspection uses a mandatory WMI snapshot and reports app-server count", () => {
+  const script = officialCodexProcessScript({ mode: "inspect", currentPid: 123 });
+
+  assert.equal(script.match(/Get-CimInstance Win32_Process/g)?.length, 1);
+  assert.match(script, /\$all = @\(Get-CimInstance Win32_Process -ErrorAction Stop\)/);
+  assert.match(script, /appServerCount/);
+  assert.match(script, /latestAppServerStartMs/);
+  assert.match(script, /processIds/);
+  assert.match(script, /ConvertTo-Json -Compress/);
+});
+
+test("activity inspection propagates a WMI enumeration failure", { skip: process.platform !== "win32" }, () => {
+  const script = officialCodexProcessScript({ mode: "inspect", currentPid: 123 })
+    .replace("$all = @(Get-CimInstance Win32_Process -ErrorAction Stop)", "throw 'WMI unavailable'");
+
+  assert.throws(
+    () => execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      encoding: "utf8",
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    }),
+    (error) => {
+      assert.match(String(error.stderr), /WMI unavailable/);
+      return true;
+    }
+  );
+});
+
+test("activity inspection ignores a later helper when reporting the app-server start", { skip: process.platform !== "win32" }, () => {
+  const appServerStart = "2026-07-16T08:00:00.000000+000";
+  const helperStart = "2026-07-16T08:05:00.000000+000";
+  const value = runInspectionWithProcesses([
+    {
+      ProcessId: 200,
+      ParentProcessId: 100,
+      Name: "codex.exe",
+      ExecutablePath: officialCliPath,
+      CommandLine: `"${officialCliPath}" app-server --analytics-default-enabled`,
+      CreationDate: appServerStart
+    },
+    {
+      ProcessId: 201,
+      ParentProcessId: 100,
+      Name: "codex-code-mode-host.exe",
+      ExecutablePath: officialCliPath.replace("codex.exe", "codex-code-mode-host.exe"),
+      CommandLine: `"${officialCliPath}" app-server-helper`,
+      CreationDate: helperStart
+    },
+    {
+      ProcessId: 202,
+      ParentProcessId: 100,
+      Name: "codex.exe",
+      ExecutablePath: officialCliPath,
+      CommandLine: `"${officialCliPath}" app-server-helper`,
+      CreationDate: helperStart
+    }
+  ]);
+
+  assert.equal(value.count, 3);
+  assert.equal(value.appServerCount, 1);
+  assert.equal(value.latestAppServerStartMs, Date.parse("2026-07-16T08:00:00.000Z"));
+});
+
+test("activity inspection preserves app-server multiplicity", { skip: process.platform !== "win32" }, () => {
+  const olderStart = "2026-07-16T08:00:00.000000+000";
+  const newerStart = "2026-07-16T08:05:00.000000+000";
+  const value = runInspectionWithProcesses([
+    {
+      ProcessId: 210,
+      ParentProcessId: 100,
+      Name: "codex.exe",
+      ExecutablePath: officialCliPath,
+      CommandLine: `"${officialCliPath}" app-server --analytics-default-enabled`,
+      CreationDate: olderStart
+    },
+    {
+      ProcessId: 211,
+      ParentProcessId: 101,
+      Name: "codex.exe",
+      ExecutablePath: officialCliPath,
+      CommandLine: `"${officialCliPath}" app-server --analytics-default-enabled`,
+      CreationDate: newerStart
+    }
+  ]);
+
+  assert.equal(value.count, 2);
+  assert.equal(value.appServerCount, 2);
+  assert.equal(value.latestAppServerStartMs, Date.parse("2026-07-16T08:05:00.000Z"));
+});
+
+test("activity inspection omits app-server start when only helpers are running", { skip: process.platform !== "win32" }, () => {
+  const value = runInspectionWithProcesses([
+    {
+      ProcessId: 201,
+      ParentProcessId: 100,
+      Name: "codex-code-mode-host.exe",
+      ExecutablePath: officialCliPath.replace("codex.exe", "codex-code-mode-host.exe"),
+      CommandLine: `"${officialCliPath}" app-server-helper`,
+      CreationDate: "2026-07-16T08:05:00.000000+000"
+    }
+  ]);
+
+  assert.equal(value.count, 1);
+  assert.equal(value.latestAppServerStartMs, null);
+});
+
+function runInspectionWithProcesses(processes) {
+  const script = officialCodexProcessScript({ mode: "inspect", currentPid: 123 })
+    .replace(
+      /\$all = @\(Get-CimInstance Win32_Process -ErrorAction (?:SilentlyContinue|Stop)\)/,
+      `$all = @(ConvertFrom-Json '${JSON.stringify(processes).replaceAll("'", "''")}' | ForEach-Object { $_ })`
+    );
+  return JSON.parse(execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+    encoding: "utf8",
+    windowsHide: true
+  }));
+}

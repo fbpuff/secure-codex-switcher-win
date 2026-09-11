@@ -1,14 +1,14 @@
 import fs from "node:fs";
+import { beijingDate, beijingDayStart } from "./beijing-time.js";
 import path from "node:path";
 import { atomicWriteJson, latestMatchingFiles, readJsonIfExists } from "./file-io.js";
 
-const TOKEN_USAGE_CACHE_VERSION = 1;
+const TOKEN_USAGE_CACHE_VERSION = 2;
 
 export function getTokenUsageStats({ codexDir, nowMs, cachePath }) {
-  const now = new Date(nowMs);
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStart = beijingDayStart(nowMs);
   const sevenDaysStart = todayStart - 6 * 24 * 60 * 60 * 1000;
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const monthStart = Date.parse(`${beijingDate(nowMs).slice(0, 7)}-01T00:00:00+08:00`);
   const totals = {
     today: emptyTokenBucket(),
     sevenDays: emptyTokenBucket(),
@@ -162,7 +162,7 @@ function parseTokenUsageText(text, summary) {
 
 function addTokenUsageSummary(totals, dailySevenDays, summary, range) {
   for (const [date, bucket] of Object.entries(summary.days ?? {})) {
-    const dayStart = Date.parse(`${date}T00:00:00`);
+    const dayStart = Date.parse(`${date}T00:00:00+08:00`);
     if (!Number.isFinite(dayStart) || dayStart > range.nowMs) {
       continue;
     }
@@ -183,17 +183,15 @@ function addTokenUsageSummary(totals, dailySevenDays, summary, range) {
 }
 
 function localDateKey(timestampMs) {
-  const date = new Date(timestampMs);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return beijingDate(timestampMs);
 }
 
 function createDailyTokenBuckets(startMs, count) {
   return Array.from({ length: count }, (_item, index) => {
     const start = startMs + index * 24 * 60 * 60 * 1000;
-    const date = new Date(start);
     return {
       ...emptyTokenBucket(),
-      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+      date: beijingDate(start),
       startMs: start,
       endMs: start + 24 * 60 * 60 * 1000
     };

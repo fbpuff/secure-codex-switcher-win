@@ -3,7 +3,7 @@ import test from "node:test";
 import { localDateInputValue, nextUsageDateState, usageDateFollowsToday } from "../src/core/usage-date.js";
 
 test("formats local dates for date inputs", () => {
-  assert.equal(localDateInputValue(new Date(2026, 5, 22)), "2026-06-22");
+  assert.equal(localDateInputValue(new Date("2026-06-22T00:00:00+08:00")), "2026-06-22");
 });
 
 test("advances stale usage date when it still follows today", () => {

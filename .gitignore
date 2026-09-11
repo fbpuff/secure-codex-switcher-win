@@ -23,11 +23,17 @@ accounts-store.json
 settings.json
 token-usage-cache.json
 usage-observations.json
+*.bak
+*.corrupt-*
 weekly-usage-reports/
 main-process.log
 *.log
 *.pid
 resume-logs/
+recovery-snapshots/
+*.migration-manifest.json
+*.migrating_*/
+Secure Codex Switcher Data/
 
 # Secrets and credentials
 .env
@@ -59,6 +65,25 @@ secure-switcher-backups/
 secure-switcher-history-backups/
 
 # Private archives and local agent metadata
+.codex/
+openspec/
+docs/
+AGENTS.md
+Data/
+Program/
+Backups/
+09_tmp/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.jsonl
+auto-switch-state.json
+auto-resume-state.json
+watchdog-intentional-exit.json
+src/build-provenance.json
+*privacy-audit*.json
+*formal-verification*.json
 .agents/
 docs/conversation-archive/
 conversation-archive/

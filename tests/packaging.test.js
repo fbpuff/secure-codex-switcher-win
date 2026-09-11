@@ -5,37 +5,132 @@ import test from "node:test";
 const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const main = fs.readFileSync(new URL("../src/main.js", import.meta.url), "utf8");
 const launcher = fs.readFileSync(new URL("../Start-CodexSwitcher.ps1", import.meta.url), "utf8");
+const verifier = fs.readFileSync(new URL("../scripts/verify-formal-install.ps1", import.meta.url), "utf8");
+const formalPackagerUrl = new URL("../scripts/package-formal.ps1", import.meta.url);
+const formalPackager = fs.existsSync(formalPackagerUrl) ? fs.readFileSync(formalPackagerUrl, "utf8") : "";
+const versionPolicyVerifierUrl = new URL("../scripts/verify-version-bump.ps1", import.meta.url);
 
 test("Windows package uses Secure Codex Switcher product identity", () => {
   assert.equal(packageJson.productName, "Secure Codex Switcher");
   assert.equal(packageJson.build.appId, "com.securecodexswitcher.windows");
   assert.equal(packageJson.build.win.executableName, "Secure Codex Switcher");
   assert.equal(packageJson.build.asar, true);
-  assert.match(packageJson.scripts["package:win"], /electron-builder/);
+  assert.match(packageJson.scripts["package:win"], /package-formal\.ps1/);
   assert.match(main, /app\.setAppUserModelId\("com\.securecodexswitcher\.windows"\)/);
   assert.match(main, /icon:\s*path\.join\(__dirname, "\.\.", "build", "icon\.png"\)/);
   assert.doesNotMatch(main, /createFromDataURL/);
 });
 
-test("packaging preserves the established user-data path", () => {
-  assert.match(main, /app\.setPath\("userData",\s*path\.join\(process\.env\.APPDATA,\s*"secure-codex-switcher-win"\)\)/);
+test("automatic continuation stays in Codex Desktop so approvals remain interactive", () => {
+  assert.match(main, /resumeExecutorMode:\s*"desktop"/);
+  assert.doesNotMatch(main, /resumeExecutorMode:\s*"app-server"/);
+  assert.match(main, /resumeInterruptedAutoResume\(\)/);
+});
+
+test("packaged app keeps private state on the formal executable drive", () => {
+  assert.match(main, /D:\\\\Secure Codex Switcher Workspace\\\\Data/);
+  assert.match(main, /app\.commandLine\.hasSwitch\("user-data-dir"\)/);
+  assert.match(main, /app\.isPackaged/);
+  assert.match(main, /Secure Codex Switcher Workspace/);
+  assert.doesNotMatch(main, /Secure Codex Switcher Data/);
+});
+
+test("unrecoverable local account state shows an actionable startup dialog", () => {
+  assert.match(main, /dialog\.showErrorBox/);
+  assert.match(main, /本地账号数据损坏且无法自动恢复/);
+  assert.match(main, /app\.whenReady\(\)[\s\S]*\.catch\(/);
 });
 
 test("standard launcher uses packaged executable and development is explicit", () => {
-  assert.match(launcher, /dist\\win-unpacked\\Secure Codex Switcher\.exe/);
+  assert.match(launcher, /D:\\Secure Codex Switcher Workspace\\Program/);
+  assert.match(launcher, /\$userDataPath\s*=\s*"D:\\Secure Codex Switcher Workspace\\Data"/);
+  assert.match(launcher, /--user-data-dir=.*\$userDataPath/);
+  assert.doesNotMatch(launcher, /D:\\Programs\\Secure Codex Switcher/);
+  assert.match(launcher, /Secure Codex Switcher\.exe/);
+  assert.doesNotMatch(launcher, /LOCALAPPDATA/);
+  assert.doesNotMatch(launcher, /C:\\Users|AppData\\Local\\Programs/);
+  assert.doesNotMatch(launcher, /dist\\win-unpacked\\Secure Codex Switcher\.exe/);
   assert.doesNotMatch(launcher, /node_modules\\electron/);
   assert.match(launcher, /shortcut-icon-2\.5\.2\.ico/);
+  assert.match(launcher, /D:\\Secure Codex Switcher Workspace\\Data/);
   assert.match(launcher, /ie4uinit\.exe/);
   assert.equal(fs.existsSync(new URL("../Start-CodexSwitcher-Dev.ps1", import.meta.url)), true);
 });
 
-test("desktop and installer shortcuts use the short label without changing product identity", () => {
+test("formal verifier and maintained launch files reject retired paths", () => {
+  assert.match(verifier, /D:\\Secure Codex Switcher Workspace\\Program/);
+  assert.match(verifier, /D:\\Secure Codex Switcher Workspace\\Data/);
+  for (const content of [main, launcher, verifier]) {
+    assert.doesNotMatch(content, /D:\\Programs\\Secure Codex Switcher/);
+    assert.doesNotMatch(content, /D:\\Secure Codex Switcher Data/);
+  }
+});
+
+test("formal executable icon verification reads PE resources instead of the shell icon cache", () => {
+  assert.match(verifier, /IconGroupEntry\.fromEntries/);
+  assert.match(verifier, /NtExecutable\.from/);
+  assert.doesNotMatch(verifier, /ExtractAssociatedIcon/);
+});
+
+test("formal packaging requires the canonical complete integration lineage and records provenance", () => {
+  assert.equal(packageJson.scripts["verify:formal-install"], "pwsh -NoProfile -File scripts/verify-formal-install.ps1");
+  assert.match(packageJson.scripts["package:dir"], /package-formal\.ps1[\s\S]*-DirectoryOnly/);
+  assert.match(formalPackager, /codex\/complete-branch-integration/);
+  for (const head of ["0c0326d", "c25ed94", "300cfe7"]) {
+    assert.match(formalPackager, new RegExp(head));
+  }
+  assert.match(formalPackager, /merge-base[\s\S]*--is-ancestor/);
+  assert.match(formalPackager, /status[\s\S]*--porcelain[\s\S]*--untracked-files=all/);
+  const versionPolicyIndex = formalPackager.indexOf("verify-version-bump.ps1");
+  const provenanceIndex = formalPackager.indexOf("build-provenance.json");
+  const builderIndex = formalPackager.indexOf("electron-builder");
+  assert.notEqual(versionPolicyIndex, -1);
+  assert.equal(fs.existsSync(versionPolicyVerifierUrl), true);
+  assert.match(formalPackager, /Test-Path[\s\S]*versionPolicyVerifier/);
+  assert.ok(versionPolicyIndex < provenanceIndex);
+  assert.ok(versionPolicyIndex < builderIndex);
+  for (const marker of [
+    "autoSwitchStayAccountId",
+    "ignoredStaleTaskCount",
+    "manual-switch-inspection",
+    "switchAccountPrioritized",
+    "orderReportAccounts",
+    "quota-auto-switch-action",
+  ]) {
+    assert.match(formalPackager, new RegExp(marker));
+  }
+  assert.match(formalPackager, /build-provenance\.json/);
+  assert.match(formalPackager, /finally[\s\S]*Remove-Item/);
+  assert.match(formalPackager, /electron-builder/);
+  assert.match(verifier, /build-provenance\.json/);
+});
+
+test("desktop and Start Menu shortcuts are repaired without changing product identity", () => {
+  assert.match(launcher, /GetFolderPath\("Desktop"\)/);
+  assert.match(launcher, /GetFolderPath\("Programs"\)/);
   assert.match(launcher, /"Codex Switcher\.lnk"/);
   assert.match(launcher, /"Secure Codex Switcher\.lnk"/);
+  assert.match(launcher, /foreach\s*\(\$shortcutDirectory\s+in\s+\$shortcutDirectories\)/);
   assert.match(launcher, /Remove-Item\s+-LiteralPath\s+\$retiredShortcut/);
   assert.equal(packageJson.build.nsis.shortcutName, "Codex Switcher");
   assert.equal(packageJson.productName, "Secure Codex Switcher");
   assert.equal(packageJson.build.win.executableName, "Secure Codex Switcher");
+});
+
+test("launcher repairs shortcuts before launch and reports each failure separately", () => {
+  const repairIndex = launcher.lastIndexOf("Repair-Shortcuts");
+  const launchIndex = launcher.indexOf("Start-DetachedSwitcher", repairIndex);
+  const launchBody = launcher.slice(launcher.lastIndexOf("try {", launchIndex), launcher.indexOf("} catch", launchIndex));
+
+  assert.notEqual(repairIndex, -1);
+  assert.notEqual(launchIndex, -1);
+  assert.ok(repairIndex < launchIndex);
+  assert.match(launchBody, /Start-DetachedSwitcher/);
+  assert.match(launcher, /\(\[wmiclass\]"Win32_Process"\)\.Create\(\$commandLine, \$installedRoot, \$startup\)/);
+  assert.match(launcher, /\$startup\.EnvironmentVariables = \[string\[\]\]/);
+  assert.doesNotMatch(launcher, /\$startup\.ShowWindow\s*=\s*0/);
+  assert.match(launcher, /Error launching Codex Switcher/);
+  assert.match(launcher, /Error repairing Codex Switcher shortcuts/);
 });
 
 test("package icon assets exist and private runtime files are excluded", () => {

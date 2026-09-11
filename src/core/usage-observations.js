@@ -6,6 +6,7 @@ import { atomicWriteJson, latestMatchingFiles, readJsonIfExists } from "./file-i
 export const OBSERVATION_VERSION = 1;
 export const OBSERVATION_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 const CAPACITY_MIN_DELTA = 2;
 const UNSCHEDULED_RESET_DELTA = 5;
 const RESET_CONFIRMATION_TOLERANCE = 2;
@@ -29,7 +30,7 @@ export function readObservationState(filePath) {
 }
 
 export function writeObservationState(filePath, state) {
-  atomicWriteJson(filePath, createObservationState(state));
+  atomicWriteJson(filePath, createObservationState(state), { compact: true });
 }
 
 export function setActiveAccount(state, { accountId, atMs, source = "unknown" }) {
@@ -66,6 +67,35 @@ export function appendQuotaSnapshot(state, value) {
   return state;
 }
 
+/**
+ * Reduce only consecutive, fully equivalent quota observations in the same
+ * account/hour bucket. Any value, reset, source, or explicit-cause change is
+ * retained so reset detection and local reports keep their evidence.
+ */
+export function compactQuotaSnapshots(state) {
+  const snapshots = Array.isArray(state?.quotaSnapshots)
+    ? state.quotaSnapshots.filter(Boolean)
+    : [];
+  if (snapshots.some((snapshot, index) => index > 0 && snapshots[index - 1].fetchedAtMs > snapshot.fetchedAtMs)) {
+    snapshots.sort((left, right) => left.fetchedAtMs - right.fetchedAtMs);
+  }
+  const latestByAccount = new Map();
+  const retained = [];
+  for (const snapshot of snapshots) {
+    const previous = latestByAccount.get(snapshot.accountId);
+    const hourBucket = Math.floor(snapshot.fetchedAtMs / HOUR_MS);
+    if (previous && previous.hourBucket === hourBucket && equivalentQuotaSnapshot(previous.snapshot, snapshot)) {
+      retained[previous.index] = snapshot;
+      previous.snapshot = snapshot;
+      continue;
+    }
+    retained.push(snapshot);
+    latestByAccount.set(snapshot.accountId, { snapshot, hourBucket, index: retained.length - 1 });
+  }
+  if (state) state.quotaSnapshots = retained;
+  return state;
+}
+
 export function pruneObservationState(state, nowMs = Date.now()) {
   const cutoff = nowMs - OBSERVATION_RETENTION_MS;
   state.quotaSnapshots = state.quotaSnapshots.filter((item) => item.fetchedAtMs >= cutoff);
@@ -74,6 +104,7 @@ export function pruneObservationState(state, nowMs = Date.now()) {
   state.intervals = state.intervals
     .filter((item) => item.endMs === undefined || item.endMs >= cutoff)
     .map((item) => ({ ...item, startMs: Math.max(item.startMs, cutoff) }));
+  compactQuotaSnapshots(state);
   return state;
 }
 
@@ -97,9 +128,14 @@ export function buildWeeklyUsageReport({ state, tokenEvents, accounts = [], week
 
 export function buildDailyUsageReport({ state, tokenEvents, accounts = [], dayStartMs }) {
   const start = startOfLocalDay(finiteTimestamp(dayStartMs) ?? Date.now());
-  const endDate = new Date(start);
-  endDate.setDate(endDate.getDate() + 1);
-  return buildUsageReport({ state, tokenEvents, accounts, start, end: endDate.getTime(), mode: "daily" });
+  return buildUsageReport({ state, tokenEvents, accounts, start, end: start + 24 * 60 * 60 * 1000, mode: "daily" });
+}
+
+export function buildWindowUsageReport({ state, tokenEvents, accounts = [], startMs, endMs }) {
+  const start = finiteTimestamp(startMs);
+  const end = finiteTimestamp(endMs);
+  if (start === undefined || end === undefined || end <= start) throw new Error("Invalid usage window");
+  return buildUsageReport({ state, tokenEvents, accounts, start, end, mode: "window" });
 }
 
 function buildUsageReport({ state, tokenEvents, accounts, start, end, mode }) {
@@ -208,17 +244,11 @@ function quotaChange(state, accountId, start, end, windowName) {
 }
 
 export function startOfLocalDay(nowMs = Date.now()) {
-  const date = new Date(nowMs);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
+  return beijingDayStart(nowMs);
 }
 
 export function startOfPreviousLocalWeek(nowMs = Date.now()) {
-  const date = new Date(nowMs);
-  date.setHours(0, 0, 0, 0);
-  const daysSinceMonday = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - daysSinceMonday - 7);
-  return date.getTime();
+  return previousBeijingWeekStart(nowMs);
 }
 
 function parseRolloutFile(filePath, events, seen, startMs, endMs) {
@@ -228,10 +258,19 @@ function parseRolloutFile(filePath, events, seen, startMs, endMs) {
   } catch {
     return;
   }
-  let model = "unknown";
-  let reasoningEffort = "unknown";
-  let sessionId = crypto.createHash("sha256").update(path.basename(filePath)).digest("hex").slice(0, 16);
-  let previousCumulative;
+  parseRolloutText(text, createRolloutParserState(filePath), events, seen, startMs, endMs);
+}
+
+export function createRolloutParserState(filePath) {
+  return {
+    model: "unknown",
+    reasoningEffort: "unknown",
+    sessionId: crypto.createHash("sha256").update(path.basename(filePath)).digest("hex").slice(0, 16),
+    previousCumulative: undefined
+  };
+}
+
+export function parseRolloutText(text, state, events, seen = new Set(), startMs = -Infinity, endMs = Infinity) {
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     let event;
@@ -242,30 +281,33 @@ function parseRolloutFile(filePath, events, seen, startMs, endMs) {
     }
     const payload = objectValue(event.payload);
     if (event.type === "session_meta") {
-      sessionId = safeIdentifier(payload.id ?? payload.session_id) ?? sessionId;
+      const sessionId = safeIdentifier(payload.id ?? payload.session_id);
+      if (sessionId) state.sessionId = sessionId;
     }
     if (event.type === "turn_context") {
-      model = safeLabel(payload.model) || "unknown";
-      reasoningEffort = safeLabel(payload.effort) || "unknown";
+      state.model = safeLabel(payload.model) || "unknown";
+      state.reasoningEffort = safeLabel(payload.effort) || "unknown";
     }
     const timestampMs = parseTimestamp(event.timestamp);
-    if (timestampMs === undefined || timestampMs < startMs || timestampMs >= endMs) continue;
+    if (timestampMs === undefined) continue;
+    const inRange = timestampMs >= startMs && timestampMs < endMs;
     const info = objectValue(payload.info);
     const lastUsage = normalizeTokenUsage(info.last_token_usage);
     const cumulative = normalizeTokenUsage(info.total_token_usage);
     let usage = lastUsage;
     if (!usage && cumulative) {
-      usage = previousCumulative ? subtractUsage(cumulative, previousCumulative) : undefined;
-      previousCumulative = cumulative;
+      usage = state.previousCumulative ? subtractUsage(cumulative, state.previousCumulative) : undefined;
+      state.previousCumulative = cumulative;
     } else if (cumulative) {
-      previousCumulative = cumulative;
+      state.previousCumulative = cumulative;
     }
-    if (!usage || usage.totalTokens <= 0) continue;
-    const key = `${sessionId}|${timestampMs}|${usage.totalTokens}|${usage.inputTokens}|${usage.outputTokens}`;
+    if (!inRange || !usage || usage.totalTokens <= 0) continue;
+    const key = `${state.sessionId}|${timestampMs}|${usage.totalTokens}|${usage.inputTokens}|${usage.outputTokens}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    events.push({ timestampMs, sessionId, model, reasoningEffort, ...usage, durationMs: 0 });
+    events.push({ timestampMs, sessionId: state.sessionId, model: state.model, reasoningEffort: state.reasoningEffort, ...usage, durationMs: 0 });
   }
+  return state;
 }
 
 function detectReset(state, previous, current, windowName) {
@@ -466,6 +508,22 @@ function subtractUsage(current, previous) {
   return result.totalTokens > 0 ? result : undefined;
 }
 
+function equivalentQuotaSnapshot(previous, current) {
+  if (!previous || !current) return false;
+  return previous.accountId === current.accountId
+    && previous.source === current.source
+    && previous.explicitResetCause === current.explicitResetCause
+    && equivalentQuotaWindow(previous.fiveHour, current.fiveHour)
+    && equivalentQuotaWindow(previous.oneWeek, current.oneWeek);
+}
+
+function equivalentQuotaWindow(previous, current) {
+  if (!previous || !current) return previous === current;
+  return previous.usedPercent === current.usedPercent
+    && previous.windowSeconds === current.windowSeconds
+    && previous.resetAt === current.resetAt;
+}
+
 function normalizeSnapshot(value) {
   const accountId = nonEmptyString(value?.accountId);
   const fetchedAtMs = finiteTimestamp(value?.fetchedAtMs ?? Number(value?.fetchedAt) * 1000);
@@ -557,3 +615,4 @@ function shortIdentifier(value) {
 function objectValue(value) {
   return value && typeof value === "object" ? value : {};
 }
+import { beijingDayStart, previousBeijingWeekStart } from "./beijing-time.js";

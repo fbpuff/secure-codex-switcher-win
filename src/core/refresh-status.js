@@ -1,14 +1,14 @@
-export function isLoginRefreshError(error) {
+export function isUsageAuthExpiredError(error) {
   const text = error instanceof Error ? `${error.message}\n${error.stack ?? ""}` : String(error ?? "");
-  return /401|needs_login|登录态被用量接口拒绝|login state needs refresh/i.test(text);
+  return /401|usage_auth_expired|用量认证已过期|usage authentication expired/i.test(text);
 }
 
 export function classifyRefreshResults(results) {
   const failures = Array.isArray(results) ? results.filter((result) => !result.ok) : [];
-  const loginFailures = failures.filter((result) => isLoginRefreshError(result.error));
+  const authExpiredFailures = failures.filter((result) => isUsageAuthExpiredError(result.error));
   return {
     failures: failures.length,
-    loginFailures: loginFailures.length,
-    otherFailures: failures.length - loginFailures.length
+    authExpiredFailures: authExpiredFailures.length,
+    otherFailures: failures.length - authExpiredFailures.length
   };
 }

@@ -6,10 +6,12 @@ import { atomicWriteJson, findStateDatabases, readJsonIfExists } from "./file-io
 const MANIFEST_NAME = "secure-switcher-http-history.json";
 const BACKUP_DIR_NAME = "secure-switcher-history-backups";
 
-export function migrateCodexHistoryProvider(codexDir, targetProvider, previousProvider = "openai") {
-  const manifestPath = path.join(codexDir, MANIFEST_NAME);
+export function migrateCodexHistoryProvider(codexDir, targetProvider, previousProvider = "openai", storage = {}) {
+  const manifestPath = storage.manifestPath ?? path.join(codexDir, MANIFEST_NAME);
+  const backupDir = storage.backupDir ?? path.join(codexDir, BACKUP_DIR_NAME);
   const existingManifest = readJsonIfExists(manifestPath);
-  const rolloutChanges = collectRolloutChanges(codexDir, () => targetProvider);
+  const rolloutDiagnostics = { skippedRollouts: [] };
+  const rolloutChanges = collectRolloutChanges(codexDir, () => targetProvider, rolloutDiagnostics);
   const dbChanges = collectDatabaseChanges(codexDir, targetProvider);
   const manifest = mergeManifest(existingManifest, {
     version: 1,
@@ -25,18 +27,23 @@ export function migrateCodexHistoryProvider(codexDir, targetProvider, previousPr
     )
   });
 
-  return applyMigration({
+  const result = applyMigration({
     codexDir,
     manifestPath,
     manifest,
     rolloutChanges,
     dbChanges,
-    targetProvider
+    targetProvider,
+    backupDir
   });
+  result.skippedRollouts = rolloutDiagnostics.skippedRollouts.length;
+  result.skippedRolloutPaths = rolloutDiagnostics.skippedRollouts;
+  return result;
 }
 
-export function revertCodexHistoryProvider(codexDir, fallbackProvider = "openai") {
-  const manifestPath = path.join(codexDir, MANIFEST_NAME);
+export function revertCodexHistoryProvider(codexDir, fallbackProvider = "openai", storage = {}) {
+  const manifestPath = storage.manifestPath ?? path.join(codexDir, MANIFEST_NAME);
+  const backupDir = storage.backupDir ?? path.join(codexDir, BACKUP_DIR_NAME);
   const manifest = readJsonIfExists(manifestPath);
   if (!manifest) {
     return { changedRollouts: 0, changedThreads: 0, skippedRollouts: 0, manifestFound: false };
@@ -45,12 +52,13 @@ export function revertCodexHistoryProvider(codexDir, fallbackProvider = "openai"
   const rolloutProviders = new Map(
     (manifest.rollouts ?? []).map((entry) => [entry.path, entry.oldProvider || fallbackProvider])
   );
+  const rolloutDiagnostics = { skippedRollouts: [] };
   const rolloutChanges = collectRolloutChanges(codexDir, (filePath, currentProvider) => {
     if (currentProvider !== manifest.targetProvider) {
       return currentProvider;
     }
     return rolloutProviders.get(toSafeRelativePath(codexDir, filePath)) ?? fallbackProvider;
-  });
+  }, rolloutDiagnostics);
   const dbChanges = collectDatabaseRevertChanges(codexDir, manifest, fallbackProvider);
   const result = applyMigration({
     codexDir,
@@ -58,14 +66,20 @@ export function revertCodexHistoryProvider(codexDir, fallbackProvider = "openai"
     manifest: undefined,
     rolloutChanges,
     dbChanges,
-    targetProvider: fallbackProvider
+    targetProvider: fallbackProvider,
+    backupDir
   });
 
-  archiveManifest(codexDir, manifestPath);
-  return { ...result, manifestFound: true };
+  archiveManifest(backupDir, manifestPath);
+  return {
+    ...result,
+    manifestFound: true,
+    skippedRollouts: rolloutDiagnostics.skippedRollouts.length,
+    skippedRolloutPaths: rolloutDiagnostics.skippedRollouts
+  };
 }
 
-function applyMigration({ codexDir, manifestPath, manifest, rolloutChanges, dbChanges, targetProvider }) {
+function applyMigration({ codexDir, manifestPath, manifest, rolloutChanges, dbChanges, targetProvider, backupDir }) {
   fs.mkdirSync(codexDir, { recursive: true });
   const pendingManifestPath = manifest ? `${manifestPath}.${process.pid}.pending` : undefined;
   const completedRollouts = [];
@@ -83,14 +97,14 @@ function applyMigration({ codexDir, manifestPath, manifest, rolloutChanges, dbCh
       if (change.rows.length === 0 && (change.restoreRows?.length ?? 0) === 0) {
         continue;
       }
-      backupDatabase(codexDir, change.path);
+      backupDatabase(backupDir, change.path);
       applyDatabaseChange(change);
       completedDatabases.push(change);
     }
     if (pendingManifestPath) {
       fs.renameSync(pendingManifestPath, manifestPath);
     }
-    pruneBackups(codexDir);
+    pruneBackups(backupDir);
     return {
       provider: targetProvider,
       changedRollouts: rolloutChanges.length,
@@ -112,11 +126,20 @@ function applyMigration({ codexDir, manifestPath, manifest, rolloutChanges, dbCh
   }
 }
 
-function collectRolloutChanges(codexDir, resolveProvider) {
+function collectRolloutChanges(codexDir, resolveProvider, diagnostics = { skippedRollouts: [] }) {
   const changes = [];
   for (const rootName of ["sessions", "archived_sessions"]) {
     for (const filePath of findRolloutFiles(path.join(codexDir, rootName))) {
-      const originalData = readRolloutMetadata(filePath);
+      let originalData;
+      try {
+        originalData = readRolloutMetadata(filePath);
+      } catch (error) {
+        diagnostics.skippedRollouts.push({
+          path: filePath,
+          reason: error instanceof Error ? error.message : String(error)
+        });
+        continue;
+      }
       const oldProvider = getProvider(originalData);
       if (!oldProvider) {
         continue;
@@ -384,21 +407,19 @@ function mergeManifest(existing, next) {
   };
 }
 
-function backupDatabase(codexDir, databasePath) {
+function backupDatabase(backupDir, databasePath) {
   if (!fs.existsSync(databasePath)) {
     return;
   }
-  const backupDir = path.join(codexDir, BACKUP_DIR_NAME);
   fs.mkdirSync(backupDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   fs.copyFileSync(databasePath, path.join(backupDir, `${path.basename(databasePath)}.${stamp}.bak`));
 }
 
-function archiveManifest(codexDir, manifestPath) {
+function archiveManifest(backupDir, manifestPath) {
   if (!fs.existsSync(manifestPath)) {
     return;
   }
-  const backupDir = path.join(codexDir, BACKUP_DIR_NAME);
   fs.mkdirSync(backupDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   try {
@@ -408,8 +429,7 @@ function archiveManifest(codexDir, manifestPath) {
   }
 }
 
-function pruneBackups(codexDir) {
-  const backupDir = path.join(codexDir, BACKUP_DIR_NAME);
+function pruneBackups(backupDir) {
   if (!fs.existsSync(backupDir)) {
     return;
   }

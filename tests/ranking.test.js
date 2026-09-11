@@ -43,6 +43,13 @@ test("breaks equal availability scores with seven day remaining quota first", ()
   assert.equal(accounts[0].id, "seven-day-heavy");
 });
 
+test("automatic selection rejects future-dated quota evidence like the display layer", () => {
+  const account = { status: "ready", usage: { fetchedAt: 1001, fiveHour: { usedPercent: 0, resetAt: 2000 } } };
+  assert.equal(pickBestAccount([account], 1000), undefined);
+  account.usage.fiveHour.usedPercent = 100;
+  assert.equal(pickRecoveryAccount([account], 1000), undefined);
+});
+
 test("picks ready fresh account with the most remaining quota", () => {
   const best = pickBestAccount(
     [
@@ -55,9 +62,37 @@ test("picks ready fresh account with the most remaining quota", () => {
   assert.equal(best.id, "best");
 });
 
+test("excludes expired usage authentication from automatic switching", () => {
+  const best = pickBestAccount([
+    { id: "expired", status: "usage_auth_expired", createdAt: 1, usage: { fetchedAt: 1_000, fiveHour: { usedPercent: 0 }, oneWeek: { usedPercent: 0 } } },
+    { id: "ready", status: "ready", createdAt: 2, usage: { fetchedAt: 1_000, fiveHour: { usedPercent: 50 }, oneWeek: { usedPercent: 50 } } }
+  ], 1_000);
+
+  assert.equal(best.id, "ready");
+});
+
 test("treats either exhausted window as exhausted", () => {
   assert.equal(isQuotaExhausted({ usage: { fiveHour: { usedPercent: 100 } } }), true);
   assert.equal(isQuotaExhausted({ usage: { oneWeek: { usedPercent: 99 } } }), false);
+});
+
+test("execution-limited accounts keep official balance context but have zero immediate availability", () => {
+  const limited = {
+    status: "ready",
+    usage: {
+      fetchedAt: 1_000,
+      executionLimited: true,
+      executionLimitWindow: "fiveHour",
+      fiveHour: { usedPercent: 2, resetAt: 2_000 },
+      oneWeek: { usedPercent: 30, resetAt: 9_000 }
+    }
+  };
+
+  assert.equal(isQuotaExhausted(limited), true);
+  assert.equal(remainingScore(limited, 1_000), 0);
+  assert.ok(quotaBalanceScore(limited, 1_000) > 0);
+  assert.equal(pickBestAccount([limited], 1_000), undefined);
+  assert.equal(pickRecoveryAccount([limited], 1_000), limited);
 });
 
 test("higher availability always wins even when the lower score resets sooner", () => {

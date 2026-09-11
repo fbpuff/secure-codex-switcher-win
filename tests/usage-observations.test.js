@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -45,6 +46,19 @@ test("parses rollout token events with model and reasoning context without conte
   assert.equal(truncated[0].model, "unknown");
 });
 
+test("hashes rollout session identifiers once while parsing resumable chunks", () => {
+  const sourceId = "synthetic-session-id";
+  const state = observations.createRolloutParserState("rollout-synthetic.jsonl");
+  const parsed = [];
+  observations.parseRolloutText([
+    event("2026-07-06T01:00:00Z", "session_meta", { id: sourceId }),
+    event("2026-07-06T01:01:00Z", "event_msg", { info: { last_token_usage: usage(10, 2, 12) } })
+  ].join("\n") + "\n", state, parsed);
+
+  assert.equal(parsed[0].sessionId, crypto.createHash("sha256").update(sourceId).digest("hex").slice(0, 16));
+  assert.doesNotMatch(JSON.stringify(parsed), new RegExp(sourceId));
+});
+
 test("recovers corrupt local observation state and prunes expired metadata", () => {
   if (!observations.readObservationState) return;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "switcher-observation-state-"));
@@ -81,6 +95,22 @@ test("tracks unambiguous active-account intervals and leaves gaps unattributed",
   ] });
   assert.equal(observations.accountAt(overlapping, 2_500), undefined);
   assert.doesNotMatch(JSON.stringify(state), /@|access_token|refresh_token/);
+});
+
+test("builds an exact token window attributed to the selected account", () => {
+  const start = Date.parse("2026-07-11T08:00:00");
+  const state = observations.createObservationState();
+  observations.setActiveAccount(state, { accountId: "account-a", atMs: start, source: "test" });
+  observations.setActiveAccount(state, { accountId: "account-b", atMs: start + 2_000, source: "test" });
+  const report = observations.buildWindowUsageReport({
+    state,
+    tokenEvents: [tokenEvent(start + 1_000, 100), tokenEvent(start + 3_000, 250)],
+    accounts: [{ id: "account-a" }, { id: "account-b" }],
+    startMs: start,
+    endMs: start + 4_000
+  });
+  assert.equal(report.accounts.find((item) => item.accountId === "account-a").totalTokens, 100);
+  assert.equal(report.accounts.find((item) => item.accountId === "account-b").totalTokens, 250);
 });
 
 test("detects scheduled and confirmed unscheduled resets without inventing reset cards", () => {
@@ -203,8 +233,8 @@ test("rejects capacity samples that cross a recorded reset", () => {
 
 test("builds a local daily report with start-inclusive end-exclusive boundaries", () => {
   assert.equal(typeof observations.buildDailyUsageReport, "function");
-  const dayStartMs = new Date(2026, 6, 10, 0, 0, 0, 0).getTime();
-  const nextDayMs = new Date(2026, 6, 11, 0, 0, 0, 0).getTime();
+  const dayStartMs = Date.parse("2026-07-10T00:00:00+08:00");
+  const nextDayMs = Date.parse("2026-07-11T00:00:00+08:00");
   const state = observations.createObservationState({
     intervals: [{ accountId: "account-a", startMs: dayStartMs, endMs: dayStartMs + 3_600_000, source: "test" }],
     resetEvents: [{ accountId: "account-a", window: "fiveHour", atMs: dayStartMs + 30_000, kind: "scheduled", cause: "boundary" }]
@@ -231,7 +261,7 @@ test("builds a local daily report with start-inclusive end-exclusive boundaries"
 });
 
 test("attributes conflict-free session gaps and reports intuitive account metrics", () => {
-  const start = new Date(2026, 6, 10).getTime();
+  const start = Date.parse("2026-07-10T00:00:00+08:00");
   const resetAtA = Math.floor((start + 10_000_000) / 1000);
   const resetAtB = resetAtA + 20_000;
   const state = observations.createObservationState({

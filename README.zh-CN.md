@@ -8,19 +8,23 @@ Secure Codex Switcher 是一个独立、仅在本机运行的 Windows 桌面程�
 
 ## 发布版本
 
-- 当前版本：**v2.15.0**
+- 当前源码版本：**v2.19.7**。本次仅更新源码，不创建新的 GitHub Release 安装包。
+- Switcher 新日志与界面时间统一使用北京时间（UTC+08:00），日报、周报和 token 日期归属不跟随电脑时区；历史日志和 Codex 原始记录保留原样。
 - 平台：Windows x64
 - 桌面运行时：Electron
 - 凭据保护：Windows DPAPI
 - 上游软件名称：**ChatGPT Codex**
 
-请从 [GitHub Releases](https://github.com/fbpuff/secure-codex-switcher-win/releases) 下载，并使用 `SHA256SUMS.txt` 校验安装包。
+公开安装包以 [GitHub Releases](https://github.com/fbpuff/secure-codex-switcher-win/releases) 的实际发布为准，并使用 `SHA256SUMS.txt` 校验。本地安装和自动测试通过，不等于真实切号续接已经验收通过。
 
 ## 主要功能
 
 - 导入并管理多个 ChatGPT Codex 登录状态。
 - 使用 Windows DPAPI 加密保存认证记录。
 - 显示 5 小时和 7 天额度快照及预计重置时间。
+- 提供可吸附屏幕左右边缘的实时额度窗；以动态水球显示额度，低于 10% 时显著变色，并可自动收边保留唤出把手。
+- 边缘额度窗显示当前账号备注、下一个切换账号、正在进行及最近完成的任务；带精确线程 ID 的任务可直接在 Codex 中打开。
+- 支持在 DPAPI 加密保留当前登录状态后添加新账号，无需先删除或退出 Switcher 中的原账号。
 - 使用透明公式对可用账号进行排序。
 - 可指定一次性的下次切换账号，也可默认选择最高评分账号。
 - 指定账号不可用时自动回退到评分最高的可用账号。
@@ -33,7 +37,7 @@ Secure Codex Switcher 是一个独立、仅在本机运行的 Windows 桌面程�
 
 ## 安装
 
-1. 从 Release 页面下载 `Secure Codex Switcher-2.15.0-x64.exe`。
+1. 从已有 Release 页面下载安装包，或按下方说明自行构建当前源码。Release 安装包版本可能早于源码分支。
 2. 与 `SHA256SUMS.txt` 中的 SHA-256 值进行比较。
 3. 运行安装程序并选择安装目录。
 4. 从桌面或开始菜单启动 **Codex Switcher**。
@@ -58,10 +62,14 @@ npm start
 构建 Windows 安装包：
 
 ```powershell
-npm run package:win
+npm run package:public
 ```
 
 生成结果位于 `dist/`，该目录不会提交到 Git。
+
+此经过隐私筛选的公开快照使用 `npm run package:public` 构建。`package:win` 和 `package:dir` 是内部正式交付检查，依赖未公开的私人开发历史；保留这些保护，不在内部源码中绕过检查。公开构建属于社区构建，不代表通过内部正式安装来源核验。
+
+打包版默认数据路径为 `D:\Secure Codex Switcher Workspace\Data`，启动脚本默认程序路径为 `D:\Secure Codex Switcher Workspace\Program`。使用所附启动脚本时应采用该布局，或向打包后的可执行文件传入 `--user-data-dir="<你的本地数据目录>"`。这是产品默认路径，不是上传的个人用户目录。
 
 ## 账号导入与存储
 
@@ -162,7 +170,7 @@ DPAPI 可以降低文件被直接读取的风险，但不能防御已使用同�
 
 ## 本地文件与隐私
 
-运行时数据保存在 Electron 的当前用户应用数据目录中，具体路径会随 Windows 和安装环境变化。
+开发运行使用 Electron 的当前用户应用数据目录；打包版默认使用上文的数据路径，显式传入的 `--user-data-dir` 优先。
 
 仓库明确排除：
 
@@ -183,6 +191,12 @@ npm audit --omit=dev
 ```
 
 不要提交从真实用户目录复制出来的运行时文件。
+
+本次公开源码更新保留既有公开历史，但不导入私人开发提交、本地任务记录、代理配置、交付证据、账号数据或日志。分享诊断信息前请阅读 [PRIVACY.md](PRIVACY.md)。
+
+### 2.19.7 验证范围
+
+发布前应用回归测试通过 730 项。隔离的 Electron 检查验证了 100%、125%、150%、200% 缩放下左右把手与客户端预留区域的尺寸一致。这些检查不证明真实鼠标拖动手感，也不保证所有环境下的真实切号续接均成功。
 
 ## 故障排查
 

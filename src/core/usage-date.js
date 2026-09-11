@@ -1,6 +1,4 @@
-export function localDateInputValue(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
+export { beijingDate as localDateInputValue } from "./beijing-time.js";
 
 export function nextUsageDateState({ value, today, followsToday }) {
   const currentValue = typeof value === "string" ? value : "";

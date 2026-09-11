@@ -8,19 +8,23 @@ Secure Codex Switcher is an independent, local-only Windows desktop application 
 
 ## Release
 
-- Current release: **v2.15.0**
+- Source version: **v2.19.7**. This update publishes source code; it does not create a new downloadable GitHub Release.
+- New Switcher logs, displayed times and report/token calendar boundaries use Beijing time (UTC+08:00), independently of the host timezone. Historical logs and Codex-owned records are preserved.
 - Platform: Windows x64
 - Desktop runtime: Electron
 - Credential protection: Windows DPAPI
 - Upstream application name: **ChatGPT Codex**
 
-Download the installer from the [GitHub Releases](https://github.com/fbpuff/secure-codex-switcher-win/releases) page and verify it against `SHA256SUMS.txt`.
+Published installers, when available, are on [GitHub Releases](https://github.com/fbpuff/secure-codex-switcher-win/releases); verify them against `SHA256SUMS.txt`. Local installation and automated tests do not by themselves verify real account-switch continuation.
 
 ## Highlights
 
 - Import and manage multiple ChatGPT Codex login states.
 - Encrypt saved authentication records with Windows DPAPI.
 - Show current 5-hour and 7-day quota snapshots and expected reset times.
+- Provide a live left/right screen-edge quota window with animated liquid meters, a distinct below-10% warning, and an auto-retracting reveal handle.
+- Show the current account remark, next switch target, active tasks, and recently completed tasks; rows with exact thread IDs open directly in Codex.
+- Add a new account after preserving the current login with DPAPI, without first deleting or signing out the original saved account.
 - Rank usable accounts with a transparent availability formula.
 - Choose a one-time next switch account or use automatic best-account selection.
 - Fall back to the best usable account when the selected target is unavailable.
@@ -33,7 +37,7 @@ Download the installer from the [GitHub Releases](https://github.com/fbpuff/secu
 
 ## Installation
 
-1. Download `Secure Codex Switcher-2.15.0-x64.exe` from the release page.
+1. Download an installer from an existing GitHub Release, or build this source version using the instructions below. Release assets may be older than the source branch.
 2. Compare its SHA-256 value with `SHA256SUMS.txt`.
 3. Run the installer and choose an installation directory.
 4. Start **Codex Switcher** from the desktop or Start menu.
@@ -58,10 +62,14 @@ npm start
 Build the Windows installer:
 
 ```powershell
-npm run package:win
+npm run package:public
 ```
 
 Generated packages are written to `dist/` and are excluded from Git.
+
+For this privacy-filtered public snapshot, use `npm run package:public` instead of `package:win` or `package:dir`. The latter are internal formal-delivery checks that require private development ancestry, which is intentionally not published. Public builds are community builds and do not carry the internal formal-install provenance claim. Do not disable these checks in an internal checkout.
+
+The default packaged data path and launcher use `D:\Secure Codex Switcher Workspace\Data` and `D:\Secure Codex Switcher Workspace\Program`. Choose that layout when using the provided launcher, or pass `--user-data-dir="<your local data directory>"` to the packaged executable. The path is a product default, not an uploaded user profile.
 
 ## Account Import And Storage
 
@@ -162,7 +170,7 @@ No custom remote telemetry, analytics service, or shared OpenSpec store is enabl
 
 ## Local Files And Privacy
 
-Runtime data is stored under Electron's per-user application data directory. Exact locations depend on Windows and installation context.
+Development uses Electron's per-user application data directory. Packaged builds default to the data path described above; an explicit `--user-data-dir` takes precedence.
 
 The repository excludes:
 
@@ -183,6 +191,12 @@ npm audit --omit=dev
 ```
 
 Never commit runtime files copied from a real user profile.
+
+This public source update preserves existing public history but does not import private development commits, local task records, agent configuration, delivery evidence, account data, or logs. See [PRIVACY.md](PRIVACY.md) before sharing diagnostics.
+
+### 2.19.7 verification scope
+
+The application regression suite passed 730 tests before publication. Isolated Electron checks verified matching left/right handle and client-reservation dimensions at 100%, 125%, 150%, and 200% scale. These checks do not establish physical drag smoothness or successful real account-switch continuation in every environment.
 
 ## Troubleshooting
 

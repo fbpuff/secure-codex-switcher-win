@@ -1,8 +1,9 @@
 $ErrorActionPreference = "Stop"
 
-$appRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$packagedExe = Join-Path $appRoot "dist\win-unpacked\Secure Codex Switcher.exe"
-$shortcutIcon = Join-Path $appRoot "dist\win-unpacked\resources\shortcut-icon-2.5.2.ico"
+$installedRoot = "D:\Secure Codex Switcher Workspace\Program"
+$packagedExe = Join-Path $installedRoot "Secure Codex Switcher.exe"
+$shortcutIcon = Join-Path $installedRoot "resources\shortcut-icon-2.5.2.ico"
+$userDataPath = "D:\Secure Codex Switcher Workspace\Data"
 $logPath = Join-Path $env:TEMP "codex-switcher-launch.log"
 
 function Show-LaunchError($message) {
@@ -37,35 +38,58 @@ function Import-WindowsProxy {
   } catch {}
 }
 
-function Update-DesktopShortcut {
-  if (-not (Test-Path -LiteralPath $shortcutIcon)) {
-    return
-  }
-  $desktop = [Environment]::GetFolderPath("Desktop")
-  $shortcutPath = Join-Path $desktop "Codex Switcher.lnk"
-  $retiredShortcut = Join-Path $desktop "Secure Codex Switcher.lnk"
+function Repair-Shortcuts {
+  $shortcutDirectories = @(
+    [Environment]::GetFolderPath("Desktop"),
+    [Environment]::GetFolderPath("Programs")
+  )
   $shell = New-Object -ComObject WScript.Shell
-  $shortcut = $shell.CreateShortcut($shortcutPath)
-  $shortcut.TargetPath = $packagedExe
-  $shortcut.WorkingDirectory = Split-Path -Parent $packagedExe
-  $shortcut.IconLocation = "$shortcutIcon,0"
-  $shortcut.Arguments = ""
-  $shortcut.Save()
-  if (Test-Path -LiteralPath $retiredShortcut) {
-    Remove-Item -LiteralPath $retiredShortcut -Force
+
+  foreach ($shortcutDirectory in $shortcutDirectories) {
+    $shortcutPath = Join-Path $shortcutDirectory "Codex Switcher.lnk"
+    $retiredShortcut = Join-Path $shortcutDirectory "Secure Codex Switcher.lnk"
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $packagedExe
+    $shortcut.WorkingDirectory = $installedRoot
+    $shortcut.IconLocation = "$shortcutIcon,0"
+    $shortcut.Arguments = "--user-data-dir=`"$userDataPath`""
+    $shortcut.Save()
+    if (Test-Path -LiteralPath $retiredShortcut) {
+      Remove-Item -LiteralPath $retiredShortcut -Force
+    }
   }
   Start-Process -FilePath "$env:SystemRoot\System32\ie4uinit.exe" -ArgumentList "-show" -WindowStyle Hidden -ErrorAction SilentlyContinue
 }
 
-try {
-  if (-not (Test-Path -LiteralPath $packagedExe)) {
-    Show-LaunchError "Cannot find the packaged application:`n$packagedExe`n`nRun npm run package:dir in the project folder."
-    exit 1
+function Start-DetachedSwitcher {
+  $commandLine = "`"$packagedExe`" --user-data-dir=`"$userDataPath`""
+  $startup = ([wmiclass]"Win32_ProcessStartup").CreateInstance()
+  $startup.EnvironmentVariables = [string[]]@(
+    [Environment]::GetEnvironmentVariables().GetEnumerator() |
+      ForEach-Object { "$($_.Key)=$($_.Value)" }
+  )
+  $result = ([wmiclass]"Win32_Process").Create($commandLine, $installedRoot, $startup)
+  if ([int]$result.ReturnValue -ne 0) {
+    throw "WMI process creation failed with code $($result.ReturnValue)."
   }
+}
 
-  Import-WindowsProxy
-  Update-DesktopShortcut
-  Start-Process -FilePath $packagedExe -WorkingDirectory (Split-Path -Parent $packagedExe)
+if (-not (Test-Path -LiteralPath $packagedExe)) {
+  Show-LaunchError "Cannot find the installed application:`n$packagedExe`n`nInstall the latest Secure Codex Switcher release first. Development builds are available only through Start-CodexSwitcher-Dev.ps1."
+  exit 1
+}
+
+Import-WindowsProxy
+try {
+  Repair-Shortcuts
+} catch {
+  Add-Content -Path $logPath -Value "$(Get-Date -Format o) Shortcut repair failed: $($_.Exception.Message)"
+  Show-LaunchError "Error repairing Codex Switcher shortcuts:`n$($_.Exception.Message)`n`nThe application was not started.`n`nLog: $logPath"
+  exit 1
+}
+
+try {
+  Start-DetachedSwitcher
 } catch {
   Add-Content -Path $logPath -Value "$(Get-Date -Format o) $($_.Exception.Message)"
   Show-LaunchError "Error launching Codex Switcher:`n$($_.Exception.Message)`n`nLog: $logPath"

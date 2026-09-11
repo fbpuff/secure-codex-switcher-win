@@ -1,0 +1,27 @@
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.edge-handle {
+  position: absolute;
+  top: 0;
+  display: none;
+  width: 12px;
+  height: 72px;
+  background: #55789f;
+}
+
+#left:target {
+  display: block;
+  left: 0;
+}
+
+#right:target {
+  display: block;
+  right: 0;
+}

@@ -25,6 +25,7 @@
           <div>
             <h1>Codex Switcher</h1>
             <p data-i18n="brand.subtitle">Windows Local</p>
+            <span id="app-version" class="app-version" aria-live="polite"></span>
           </div>
         </div>
 
@@ -32,6 +33,10 @@
           <button id="accounts-nav" class="nav-item active" type="button">
             <span class="nav-icon accounts-icon" aria-hidden="true"></span>
             <span data-i18n="nav.accounts">账号</span>
+          </button>
+          <button id="threads-nav" class="nav-item" type="button">
+            <span class="nav-icon threads-icon" aria-hidden="true"></span>
+            <span data-i18n="nav.threads">线程</span>
           </button>
           <button id="usage-nav" class="nav-item" type="button">
             <span class="nav-icon usage-icon" aria-hidden="true"></span>
@@ -60,7 +65,14 @@
               <span class="eyebrow" data-i18n="top.eyebrow">本机账号保险箱</span>
               <h2 data-i18n="top.title">账号余量与切换</h2>
               <p id="status-line">准备就绪</p>
-              <p id="quota-warning-line" class="quota-warning-line" hidden></p>
+              <details id="activity-diagnostics" class="activity-diagnostics" hidden>
+                <summary data-i18n="status.activityDiagnostics">诊断详情</summary>
+                <code id="activity-diagnostic-ids"></code>
+              </details>
+              <p id="quota-warning-line" class="quota-warning-line" hidden>
+                <span id="quota-warning-text"></span>
+                <button id="quota-auto-switch-action" class="secondary-action" type="button" hidden></button>
+              </p>
             </div>
             <div class="topbar-actions">
               <label class="language-select">
@@ -73,6 +85,10 @@
               <button id="import-current" class="primary-action" type="button">
                 <span class="button-icon import-icon" aria-hidden="true"></span>
                 <span data-i18n="actions.importCurrent">导入/新增当前</span>
+              </button>
+              <button id="add-account" type="button">
+                <span class="button-icon import-icon" aria-hidden="true"></span>
+                <span data-i18n="actions.addAccount">添加新账号</span>
               </button>
               <button id="refresh-all" type="button">
                 <span class="button-icon refresh-icon" aria-hidden="true"></span>
@@ -167,6 +183,56 @@
           </section>
         </section>
 
+        <section id="threads-view" class="threads-view" hidden>
+          <header class="threads-header">
+            <div>
+              <span class="eyebrow" data-i18n="threads.eyebrow">本机线程索引</span>
+              <h2 data-i18n="threads.title">任务活动与线程检索</h2>
+              <p data-i18n="threads.subtitle">活动列表只使用本机 Codex 生命周期与登记证据；检索只读取标题、ID、项目路径和时间，不读取对话正文。</p>
+            </div>
+          </header>
+
+          <section class="threads-section">
+            <div class="threads-section-heading">
+              <div>
+                <h3 data-i18n="threads.active">正在执行的任务</h3>
+                <p data-i18n="threads.activeHelp">打开本页时每两秒刷新；这里只统计正在执行的任务，不包含闲置或等待输入的线程。</p>
+              </div>
+              <strong id="threads-active-count" class="threads-count">0</strong>
+            </div>
+            <div id="threads-active-list" class="thread-list" aria-live="polite"></div>
+          </section>
+
+          <section class="threads-section">
+            <div class="threads-section-heading">
+              <div>
+                <h3 data-i18n="threads.searchTitle">检索本机线程</h3>
+                <p data-i18n="threads.searchHelp">按标题、线程 ID、所属项目或任务目录查找。不会读取消息、预览或提示词。</p>
+              </div>
+            </div>
+            <label class="search-field thread-search-field">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input id="threads-search" type="search" data-i18n-placeholder="threads.searchPlaceholder" placeholder="搜索标题、线程 ID、所属项目或任务目录" />
+            </label>
+            <div class="thread-search-options">
+              <label class="thread-archive-toggle">
+                <input id="threads-show-archived" type="checkbox" />
+                <span data-i18n="threads.showArchived">显示已归档</span>
+              </label>
+              <label class="thread-archive-toggle">
+                <input id="threads-show-internal" type="checkbox" />
+                <span data-i18n="threads.showInternal">显示内部任务</span>
+              </label>
+              <label class="thread-archive-toggle">
+                <input id="threads-show-unregistered" type="checkbox" checked />
+                <span data-i18n="threads.showUnregistered">显示未登记目录</span>
+              </label>
+            </div>
+            <p id="threads-search-status" class="threads-search-status" aria-live="polite" data-i18n="threads.searchPrompt">显示最近更新的本机线程。</p>
+            <div id="threads-search-results" class="thread-list" aria-live="polite"></div>
+          </section>
+        </section>
+
         <section id="usage-view" class="usage-view" hidden>
           <header class="usage-header">
             <div>
@@ -249,7 +315,13 @@
           <p id="reports-refresh-state" class="reports-refresh-state" aria-live="polite"></p>
 
           <section class="reports-controls" aria-label="Report filters">
-            <label><span id="reports-date-label" data-i18n="reports.date">日期</span><input id="reports-week" type="date" /></label>
+            <div class="reports-date-control">
+              <span id="reports-date-label" data-i18n="reports.date">日期</span>
+              <div class="reports-date-field">
+                <input id="reports-week" type="date" aria-labelledby="reports-date-label" />
+                <button id="reports-today" type="button" data-i18n="reports.backToToday" data-i18n-title="reports.backToToday">今天</button>
+              </div>
+            </div>
             <label><span data-i18n="reports.account">账号</span><select id="reports-account-filter"></select></label>
             <label><span data-i18n="reports.model">模型</span><select id="reports-model-filter"></select></label>
             <label><span data-i18n="reports.effort">思考强度</span><select id="reports-effort-filter"></select></label>
@@ -329,6 +401,13 @@
                   </label>
                 </span>
               </label>
+              <label class="settings-row">
+                <span>
+                  <strong data-i18n="settings.edgeWindow">屏幕边缘额度窗</strong>
+                  <small data-i18n="settings.edgeWindowHelp">在屏幕左右边缘显示实时额度、账号和最近任务；移出后自动收边。</small>
+                </span>
+                <input id="settings-edge-window" type="checkbox" />
+              </label>
               <fieldset class="settings-field radio-stack">
                 <legend data-i18n="settings.closeBehavior">关闭窗口行为</legend>
                 <label>
@@ -360,6 +439,15 @@
                 </span>
                 <input id="settings-auto-switch" type="checkbox" />
               </label>
+              <label class="settings-row">
+                <span>
+                  <strong data-i18n="settings.autoResumeAfterQuotaSwitch">额度切换后自动继续任务</strong>
+                  <small data-i18n="settings.autoResumeAfterQuotaSwitchHelp">额度触发自动切换后，逐个继续当前账号周期内所有已明确识别的额度中断任务；无法确认身份的任务不会猜测。</small>
+                </span>
+                <input id="settings-auto-resume-after-quota" type="checkbox" />
+              </label>
+              <div id="settings-auto-exclusions" class="settings-exclusion-summary" aria-live="polite"></div>
+              <button id="settings-clear-auto-exclusions" class="secondary-action settings-exclusion-clear" type="button" data-i18n="settings.clearAutoSwitchExclusions">清除全部排除</button>
               <label class="settings-row">
                 <span>
                   <strong data-i18n="settings.confirmSwitch">切换确认</strong>
@@ -397,6 +485,68 @@
                 </span>
                 <input id="settings-http-only" type="checkbox" />
               </label>
+              <label class="settings-row">
+                <span>
+                  <strong data-i18n="settings.disableGpu">默认禁用 GPU 启动 Codex</strong>
+                  <small data-i18n="settings.disableGpuHelp">用于规避内置浏览器 GPU 崩溃；未单独设置的账号继承此选项。</small>
+                </span>
+                <input id="settings-disable-gpu" type="checkbox" />
+              </label>
+            </section>
+
+            <section id="settings-codex-backup" class="settings-section">
+              <h3 data-i18n="settings.codexBackupTitle">Codex 备份与恢复</h3>
+              <p data-i18n="settings.codexBackupHelp">备份仅保存在本机 D 盘；恢复预览只显示数量，不显示对话正文。</p>
+              <div class="settings-button-stack">
+                <button id="settings-run-conversation-backup" type="button" data-i18n="settings.runConversationBackup">立即备份对话</button>
+              </div>
+              <p id="settings-backup-status" aria-live="polite"></p>
+              <div id="settings-backup-progress" class="settings-backup-progress" hidden>
+                <strong id="settings-backup-progress-stage"></strong>
+                <progress id="settings-backup-progress-bar" max="100"></progress>
+                <small id="settings-backup-progress-detail" aria-live="polite"></small>
+              </div>
+              <p id="settings-backup-policy" class="settings-note" data-i18n="settings.backupPolicy">自动备份每 24 小时在 Codex 完全关闭后执行快速增量检查；每 7 天或手动备份时执行完整校验。</p>
+              <label class="settings-field">
+                <span data-i18n="settings.completeRecoveryPoint">完整恢复点</span>
+                <select id="settings-complete-recovery-point"></select>
+              </label>
+              <div id="settings-recovery-progress" class="settings-backup-progress" hidden>
+                <strong id="settings-recovery-progress-stage"></strong>
+                <progress id="settings-recovery-progress-bar" max="100"></progress>
+                <small id="settings-recovery-progress-detail" aria-live="polite"></small>
+              </div>
+              <p class="settings-note" data-i18n="settings.independentBackups">更早的独立备份</p>
+              <label class="settings-field">
+                <span data-i18n="settings.criticalBackup">关键状态备份</span>
+                <select id="settings-critical-backup"></select>
+              </label>
+              <button id="settings-show-earlier-backups" type="button" data-i18n="settings.showEarlierBackups" hidden>显示更早备份</button>
+              <label class="settings-field">
+                <span data-i18n="settings.conversationBackup">加密对话备份</span>
+                <select id="settings-conversation-backup"></select>
+              </label>
+              <div id="settings-quarantined-conversation-backup-row" hidden>
+                <label class="settings-field">
+                  <span data-i18n="settings.quarantinedConversationBackup">隔离的对话备份</span>
+                  <select id="settings-quarantined-conversation-backup"></select>
+                </label>
+                <div class="settings-button-stack">
+                  <button id="settings-revalidate-quarantined-conversation" type="button" data-i18n="settings.revalidateQuarantinedConversation">重新校验并恢复到可用列表</button>
+                </div>
+              </div>
+              <p id="settings-quarantined-conversation-status" class="settings-note" aria-live="polite"></p>
+              <div class="settings-button-stack">
+                <button id="settings-preview-recovery" type="button" data-i18n="settings.previewRecovery">预览恢复</button>
+                <button id="settings-refresh-recovery-backups" type="button" data-i18n="settings.refreshRecoveryBackups">刷新备份列表</button>
+              </div>
+              <div id="settings-recovery-preview" class="settings-recovery-preview" aria-live="polite"></div>
+              <aside id="settings-recovery-danger" class="settings-recovery-danger" aria-labelledby="settings-recovery-danger-title">
+                <strong id="settings-recovery-danger-title" data-i18n="settings.replaceRecoveryTitle">危险操作：精确替换</strong>
+                <p data-i18n="settings.replaceRecoveryHelp">仅在核对预览后使用。选定备份之外的会话将被删除。</p>
+                <button id="settings-replace-recovery" class="settings-replace-recovery danger" type="button" disabled data-i18n="settings.replaceRecovery">精确替换为选定备份</button>
+                <p id="settings-replacement-status" aria-live="polite"></p>
+              </aside>
             </section>
 
             <section class="settings-section">
@@ -487,6 +637,31 @@
       </form>
     </dialog>
 
+    <dialog id="manual-switch-dialog" class="modal-dialog" aria-labelledby="manual-switch-dialog-title">
+      <form method="dialog" class="modal-panel">
+        <h3 id="manual-switch-dialog-title" data-i18n="modal.manualSwitchTitle">手动切换账号</h3>
+        <p id="manual-switch-dialog-intro"></p>
+        <label class="modal-choice">
+          <input id="manual-switch-resume" type="checkbox" />
+          <span>
+            <strong data-i18n="modal.manualSwitchResume">切换后继续额度中断的任务</strong>
+            <small data-i18n="modal.manualSwitchResumeHelp">默认启用；Switcher 会识别并分别继续当前账号周期内所有可确认的额度中断任务。</small>
+          </span>
+        </label>
+        <label class="modal-choice">
+          <input id="manual-switch-force" type="checkbox" />
+          <span>
+            <strong data-i18n="modal.manualSwitchForce">强制切换</strong>
+            <small data-i18n="modal.manualSwitchForceHelp">仅在普通切换被续接任务阻止时使用；可取消的续接会停止，其他安全校验不会绕过。</small>
+          </span>
+        </label>
+        <div class="modal-actions">
+          <button value="cancel" type="submit" data-i18n="actions.cancel">取消</button>
+          <button class="primary-action" value="confirm" type="submit" data-i18n="actions.switch">切换</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="close-dialog" class="modal-dialog">
       <form method="dialog" class="modal-panel">
         <h3 data-i18n="close.title">关闭 Codex Switcher？</h3>
@@ -499,6 +674,21 @@
           <button value="minimize" type="submit" data-i18n="close.minimize">最小化窗口</button>
           <button value="tray" type="submit" data-i18n="close.tray">最小化到托盘</button>
           <button class="danger" value="quit" type="submit" data-i18n="close.quit">关闭应用</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="remark-dialog" class="modal-dialog" aria-labelledby="remark-dialog-title">
+      <form method="dialog" class="modal-panel">
+        <h3 id="remark-dialog-title" data-i18n="modal.remarkTitle">编辑账号备注</h3>
+        <p data-i18n="modal.remarkIntro">备注仅保存在本机，留空后保存即可清除。</p>
+        <label class="modal-field">
+          <span data-i18n="modal.remarkLabel">备注（最多 80 个字符）</span>
+          <input id="remark-input" maxlength="80" type="text" autocomplete="off" />
+        </label>
+        <div class="modal-actions">
+          <button id="remark-cancel" value="cancel" type="button" data-i18n="actions.cancel">取消</button>
+          <button class="primary-action" value="save" type="submit" data-i18n="actions.save">保存</button>
         </div>
       </form>
     </dialog>

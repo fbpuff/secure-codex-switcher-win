@@ -8,12 +8,13 @@ export function officialCodexProcessIds(processes, options = {}) {
     .sort((left, right) => left - right);
 }
 
-export function officialCodexProcessScript({ mode, currentPid, excludeCurrentTree = false }) {
+export function officialCodexProcessScript({ mode, currentPid, excludeCurrentTree = false, desktopOnly = false }) {
   const close = mode === "close";
+  const inspect = mode === "inspect";
   return `
 $ErrorActionPreference = 'Stop'
 $currentPid = ${Number(currentPid) || 0}
-$all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+$all = @(Get-CimInstance Win32_Process -ErrorAction ${inspect ? "Stop" : "SilentlyContinue"})
 function IsOfficialCodex($process) {
   if (-not $process -or -not $process.ExecutablePath) { return $false }
   return (
@@ -30,6 +31,23 @@ function IsOfficialCodex($process) {
       $process.ExecutablePath -like '*\\.codex\\.sandbox-bin\\codex.exe' -or
       $process.ExecutablePath -like '*\\.codex\\plugins\\.plugin-appserver\\codex.exe'
     )
+  )
+}
+function IsOfficialCodexAppServer($process) {
+  if (-not $process -or $process.Name -ine 'codex.exe' -or -not $process.ExecutablePath) { return $false }
+  return (
+    $process.CommandLine -match '(?:^|\\s)app-server(?:\\s|$)' -and
+    (
+      $process.ExecutablePath -like '*\\OpenAI.Codex_*' -or
+      $process.ExecutablePath -like '*\\AppData\\Local\\OpenAI\\Codex\\*'
+    )
+  )
+}
+function IsOfficialCodexDesktop($process) {
+  if (-not $process -or -not $process.ExecutablePath) { return $false }
+  return (
+    ($process.Name -ieq 'ChatGPT.exe' -or $process.Name -ceq 'Codex.exe') -and
+    $process.ExecutablePath -like '*\\OpenAI.Codex_*'
   )
 }
 function CurrentOfficialCodexTreeIds {
@@ -65,14 +83,25 @@ function CurrentOfficialCodexTreeIds {
 }
 $excluded = ${excludeCurrentTree ? "CurrentOfficialCodexTreeIds" : "New-Object System.Collections.Generic.HashSet[int]"}
 $targets = @($all | Where-Object {
-  (IsOfficialCodex $_) -and
+  (${desktopOnly ? "IsOfficialCodexDesktop $_" : "IsOfficialCodex $_"}) -and
   ([int]$_.ProcessId -ne $currentPid) -and
   (-not $excluded.Contains([int]$_.ProcessId))
 })
-${close ? closeScriptBody() : "Write-Output $targets.Count"}
+${close ? closeScriptBody() : inspect ? inspectScriptBody() : "Write-Output $targets.Count"}
 `;
 }
 
+function inspectScriptBody() {
+  return `$targetIds = New-Object System.Collections.Generic.HashSet[int]
+foreach ($target in $targets) { [void]$targetIds.Add([int]$target.ProcessId) }
+$hosts = @($targets | Where-Object { -not $targetIds.Contains([int]$_.ParentProcessId) })
+$appServers = @($targets | Where-Object { IsOfficialCodexAppServer $_ })
+$appServerStartTimes = @($appServers | ForEach-Object {
+  if ($_.CreationDate) { [DateTimeOffset]::new([datetime]$_.CreationDate).ToUnixTimeMilliseconds() }
+})
+$latestAppServerStartMs = if ($appServerStartTimes.Count -gt 0) { ($appServerStartTimes | Measure-Object -Maximum).Maximum } else { $null }
+[pscustomobject]@{ count = $targets.Count; hostCount = $hosts.Count; processIds = @($targets | ForEach-Object { [int]$_.ProcessId }); appServerCount = $appServers.Count; latestAppServerStartMs = $latestAppServerStartMs } | ConvertTo-Json -Compress`;
+}
 function closeScriptBody() {
   return `$count = 0
 foreach ($target in $targets) {

@@ -9,7 +9,7 @@ export function scoreBreakdown(account, now = Math.floor(Date.now() / 1000)) {
   const balanceTotal = remaining.length === 2
     ? Math.min(...remaining) * 0.60 + values.fiveHourRemaining * 0.20 + values.oneWeekRemaining * 0.20
     : remaining[0] ?? 0;
-  const total = remaining.includes(0) ? 0 : balanceTotal;
+  const total = isQuotaExhausted(account) || remaining.includes(0) ? 0 : balanceTotal;
   return { ...values, minimumRemaining: remaining.length ? Math.min(...remaining) : undefined, balanceTotal, total };
 }
 
@@ -53,8 +53,7 @@ export function compareAccountsByScore(left, right, now = Math.floor(Date.now() 
 
 export function pickBestAccount(accounts, now = Math.floor(Date.now() / 1000)) {
   return [...accounts]
-    .filter((account) => account.status === "ready")
-    .filter((account) => account.usage?.fetchedAt && now - account.usage.fetchedAt <= 10 * 60)
+    .filter((account) => hasFreshKnownUsage(account, now))
     .filter((account) => !isQuotaExhausted(account))
     .filter((account) => !hasPassedReset(account, now))
     .sort((left, right) => compareAccountsByScore(left, right, now))[0];
@@ -62,8 +61,7 @@ export function pickBestAccount(accounts, now = Math.floor(Date.now() / 1000)) {
 
 export function pickRecoveryAccount(accounts, now = Math.floor(Date.now() / 1000)) {
   return [...accounts]
-    .filter((account) => account.status === "ready")
-    .filter((account) => account.usage?.fetchedAt && now - account.usage.fetchedAt <= 10 * 60)
+    .filter((account) => hasFreshKnownUsage(account, now))
     .filter((account) => isQuotaExhausted(account))
     .map((account) => ({ account, resetAt: exhaustedResetAt(account, now) }))
     .filter((item) => Number.isFinite(item.resetAt))
@@ -71,7 +69,9 @@ export function pickRecoveryAccount(accounts, now = Math.floor(Date.now() / 1000
 }
 
 export function isQuotaExhausted(account) {
-  return isWindowExhausted(account?.usage?.fiveHour) || isWindowExhausted(account?.usage?.oneWeek);
+  return account?.usage?.executionLimited === true
+    || isWindowExhausted(account?.usage?.fiveHour)
+    || isWindowExhausted(account?.usage?.oneWeek);
 }
 
 function isWindowExhausted(window) {
@@ -79,8 +79,25 @@ function isWindowExhausted(window) {
 }
 
 function remainingPercent(window) {
+  const normalizedRemaining = Number(window?.remainingPercent);
+  if (Number.isFinite(normalizedRemaining) && normalizedRemaining >= 0 && normalizedRemaining <= 100) {
+    return normalizedRemaining;
+  }
   const usedPercent = Number(window?.usedPercent);
   return Number.isFinite(usedPercent) ? clamp(100 - usedPercent) : undefined;
+}
+
+function hasFreshKnownUsage(account, now) {
+  const fetchedAt = Number(account?.usage?.fetchedAt);
+  const age = now - fetchedAt;
+  const breakdown = scoreBreakdown(account, now);
+  return account?.status === "ready"
+    && !account?.usageError
+    && Number.isFinite(fetchedAt)
+    && fetchedAt > 0
+    && age >= 0
+    && age <= 10 * 60
+    && breakdown.minimumRemaining !== undefined;
 }
 
 function futureResetAt(window, now) {
@@ -112,8 +129,11 @@ function nearestResetAt(account) {
 }
 
 export function exhaustedResetAt(account, now = Math.floor(Date.now() / 1000)) {
-  const resetTimes = [account?.usage?.fiveHour, account?.usage?.oneWeek]
-    .filter((window) => isWindowExhausted(window))
+  const limitedWindow = account?.usage?.executionLimited === true
+    ? account?.usage?.[account.usage.executionLimitWindow]
+    : undefined;
+  const resetTimes = [account?.usage?.fiveHour, account?.usage?.oneWeek, limitedWindow]
+    .filter((window) => window === limitedWindow || isWindowExhausted(window))
     .map((window) => Number(window?.resetAt))
     .filter((resetAt) => Number.isFinite(resetAt) && resetAt > now);
   return resetTimes.length ? Math.min(...resetTimes) : undefined;
