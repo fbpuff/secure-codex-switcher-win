@@ -144,6 +144,62 @@ function createDiagnosticsHarness(initialPending, nextPending, options = {}) {
   };
 }
 
+test("pending switch survives refresh completion before asynchronous evaluation resolves", async () => {
+  const pending = { emailMasked: "fixture@example.invalid", activeThreadIds: ["fixture-thread"] };
+  let release;
+  let entered;
+  const evaluating = new Promise((resolve) => { entered = resolve; });
+  const result = new Promise((resolve) => { release = resolve; });
+  const harness = createDiagnosticsHarness(pending, pending, {
+    evaluateAutoSwitch: (_reason, count) => {
+      if (count > 1) return { status: "idle" };
+      entered();
+      return result;
+    }
+  });
+  const original = harness.statusLine.textContent;
+  const loading = harness.loadAccounts("background refresh completed");
+  await evaluating;
+  try {
+    assert.equal(harness.statusLine.textContent, original);
+  } finally {
+    release({ status: "queued", pending });
+    await loading;
+  }
+  harness.setApiPending(undefined);
+  await harness.loadAccounts("normal refresh completed");
+  assert.equal(harness.statusLine.textContent, "normal refresh completed");
+});
+
+test("identical status does not replace text but still clears obsolete diagnostics", () => {
+  let writes = 0;
+  const statusLine = { get textContent() { return "same"; }, set textContent(value) { writes += 1; } };
+  let clears = 0;
+  const source = rendererFunctionSource("function setStatus(", "function showActivityDiagnostics(");
+  const setStatus = new Function("statusLine", "clearActivityDiagnostics", `${source}; return setStatus;`)(statusLine, () => { clears += 1; });
+  setStatus("same", { preserveActivityDiagnostics: true });
+  assert.equal(writes, 0);
+  assert.equal(clears, 0);
+  setStatus("same");
+  assert.equal(writes, 0);
+  assert.equal(clears, 1);
+  setStatus("changed");
+  assert.equal(writes, 1);
+});
+
+test("quota polling ignores attempt timestamps while tracking quota freshness and errors", () => {
+  const source = rendererFunctionSource("function currentQuotaSignature(", "async function syncCurrentQuotaDisplay(");
+  const signature = new Function(`${source}; return currentQuotaSignature;`)();
+  const current = { id: "fixture", isCurrent: true, usage: { fetchedAt: 100, fiveHour: { remainingPercent: 1 } }, usageRefreshAttemptedAt: 100 };
+  assert.equal(signature([current]), signature([{ ...current, usageRefreshAttemptedAt: 101 }]));
+  for (const changed of [
+    { ...current, usage: { ...current.usage, fetchedAt: 101 } },
+    { ...current, usage: { ...current.usage, fiveHour: { remainingPercent: 0 } } },
+    { ...current, usageError: "unavailable" },
+    { ...current, id: "other-fixture" }
+  ]) assert.notEqual(signature([current]), signature([changed]));
+});
+
 function createFinishAutoSwitchHarness(autoResumeStatus) {
   const finishSource = rendererFunctionSource("async function finishAutoSwitch(", "async function refreshAccountUsage(");
   const createHarness = new Function("dependencies", `
@@ -484,7 +540,7 @@ test("superseded deferred loadAccounts cannot overwrite or reevaluate a newer lo
     evaluations: harness.getEvaluationCount()
   }, {
     accountId: "account-B",
-    status: "new load",
+    status: "status.autoSwitchQuietCountdown:b@example.com",
     evaluations: 1
   });
   assert.equal(harness.activityDiagnosticIds.textContent, "thread-B");

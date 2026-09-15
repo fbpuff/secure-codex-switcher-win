@@ -576,6 +576,14 @@ button:disabled {
   color: var(--muted);
 }
 
+.account-status-region {
+  height: 128px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
 .topbar .quota-warning-line {
   max-width: 720px;
   margin-top: 9px;

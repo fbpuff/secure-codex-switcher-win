@@ -1,7 +1,7 @@
 {
   "name": "secure-codex-switcher-win",
   "productName": "Secure Codex Switcher",
-  "version": "2.19.7",
+  "version": "2.19.8",
   "private": true,
   "author": "Secure Codex Switcher Contributors",
   "description": "A local-only Windows Codex account switcher with encrypted account storage and usage-aware switching.",

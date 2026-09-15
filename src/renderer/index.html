@@ -64,15 +64,17 @@
             <div>
               <span class="eyebrow" data-i18n="top.eyebrow">本机账号保险箱</span>
               <h2 data-i18n="top.title">账号余量与切换</h2>
-              <p id="status-line">准备就绪</p>
-              <details id="activity-diagnostics" class="activity-diagnostics" hidden>
-                <summary data-i18n="status.activityDiagnostics">诊断详情</summary>
-                <code id="activity-diagnostic-ids"></code>
-              </details>
-              <p id="quota-warning-line" class="quota-warning-line" hidden>
-                <span id="quota-warning-text"></span>
-                <button id="quota-auto-switch-action" class="secondary-action" type="button" hidden></button>
-              </p>
+              <div class="account-status-region" tabindex="0" role="region" aria-label="账号状态" data-i18n-aria-label="top.statusRegion">
+                <p id="status-line">准备就绪</p>
+                <details id="activity-diagnostics" class="activity-diagnostics" hidden>
+                  <summary data-i18n="status.activityDiagnostics">诊断详情</summary>
+                  <code id="activity-diagnostic-ids"></code>
+                </details>
+                <p id="quota-warning-line" class="quota-warning-line" hidden>
+                  <span id="quota-warning-text"></span>
+                  <button id="quota-auto-switch-action" class="secondary-action" type="button" hidden></button>
+                </p>
+              </div>
             </div>
             <div class="topbar-actions">
               <label class="language-select">

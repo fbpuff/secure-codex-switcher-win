@@ -8,7 +8,8 @@ Secure Codex Switcher 是一个独立、仅在本机运行的 Windows 桌面程�
 
 ## 发布版本
 
-- 当前源码版本：**v2.19.7**。本次仅更新源码，不创建新的 GitHub Release 安装包。
+- 当前版本：**v2.19.8**，提供 Windows x64 安装包。
+- 修复切号前额度刷新导致状态提示反复变化、账号列表上下跳动的问题；长提示和诊断详情在固定高度的状态区内滚动。
 - Switcher 新日志与界面时间统一使用北京时间（UTC+08:00），日报、周报和 token 日期归属不跟随电脑时区；历史日志和 Codex 原始记录保留原样。
 - 平台：Windows x64
 - 桌面运行时：Electron
@@ -37,7 +38,7 @@ Secure Codex Switcher 是一个独立、仅在本机运行的 Windows 桌面程�
 
 ## 安装
 
-1. 从已有 Release 页面下载安装包，或按下方说明自行构建当前源码。Release 安装包版本可能早于源码分支。
+1. 从 [v2.19.8 Release](https://github.com/fbpuff/secure-codex-switcher-win/releases/tag/v2.19.8) 下载 Windows x64 安装包，或按下方说明自行构建当前源码。
 2. 与 `SHA256SUMS.txt` 中的 SHA-256 值进行比较。
 3. 运行安装程序并选择安装目录。
 4. 从桌面或开始菜单启动 **Codex Switcher**。

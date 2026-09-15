@@ -246,6 +246,7 @@ const messages = {
     "threads.copyFailed": "无法复制线程 ID。",
     "top.eyebrow": "本机账号保险箱",
     "top.title": "账号余量与切换",
+    "top.statusRegion": "账号状态",
     "top.language": "语言",
     "actions.importCurrent": "导入/新增当前",
     "actions.addAccount": "添加新账号",
@@ -878,6 +879,7 @@ const messages = {
     "threads.copyFailed": "Unable to copy thread ID.",
     "top.eyebrow": "Local account vault",
     "top.title": "Usage & Switching",
+    "top.statusRegion": "Account status",
     "top.language": "Language",
     "actions.importCurrent": "Import/Add Current",
     "actions.addAccount": "Add New Account",
@@ -2968,8 +2970,7 @@ function currentQuotaSignature(list) {
   return JSON.stringify({
     id: current?.id,
     usage: current?.usage,
-    usageError: current?.usageError,
-    usageRefreshAttemptedAt: current?.usageRefreshAttemptedAt
+    usageError: current?.usageError
   });
 }
 
@@ -3031,9 +3032,11 @@ async function loadAccounts(message, options = {}) {
     accountSurfacesDirty = false;
     restoreAccountReadingContext(readingContext);
   }
-  setStatus(message, {
-    preserveActivityDiagnostics: Boolean(pendingAutoSwitch && !activityDiagnostics.hidden && activityDiagnosticIds.textContent)
-  });
+  if (pendingAutoSwitch) {
+    renderPendingAutoSwitchStatus();
+  } else {
+    setStatus(message);
+  }
   await evaluateQuotaActions(options.reason ?? "load", requestId);
 }
 
@@ -5325,7 +5328,7 @@ function clearActivityDiagnostics() {
 }
 
 function setStatus(message, { preserveActivityDiagnostics = false } = {}) {
-  statusLine.textContent = message;
+  if (statusLine.textContent !== message) statusLine.textContent = message;
   if (!preserveActivityDiagnostics) clearActivityDiagnostics();
 }
 
