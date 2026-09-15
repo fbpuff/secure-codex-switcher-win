@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell, Menu, nativeImage, screen, Tray } from "electron";
 import fs from "node:fs";
+import os from "node:os";
+import { selectStartupDataPath, prepareStartupDataPath, startupFailureMessage } from "./core/startup-storage.js";
 import { beijingTimestamp } from "./core/beijing-time.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,15 +41,8 @@ import {
 } from "./core/edge-window-lifecycle.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const defaultUserDataPath = process.platform === "win32"
-  ? (app.isPackaged
-    ? "D:\\Secure Codex Switcher Workspace\\Data"
-    : path.join(process.env.APPDATA || __dirname, "secure-codex-switcher-win"))
-  : undefined;
-
-if (defaultUserDataPath && !app.commandLine.hasSwitch("user-data-dir")) {
-  app.setPath("userData", defaultUserDataPath);
-}
+let defaultUserDataPath;
+const startupLogPath = path.join(os.tmpdir(), "secure-codex-switcher-win", "startup.log");
 app.setName("Secure Codex Switcher");
 app.setAppUserModelId("com.securecodexswitcher.windows");
 
@@ -87,7 +82,7 @@ let edgeHandleRecoveryTimer;
 let edgeHandleRecoveryAttempts = 0;
 let watchdog;
 const recoverableWarningState = new Map();
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
+let gotSingleInstanceLock = false;
 
 process.on("uncaughtException", (error) => {
   handleMainProcessFailure("uncaughtException", error);
@@ -96,6 +91,20 @@ process.on("uncaughtException", (error) => {
 process.on("unhandledRejection", (reason) => {
   handleMainProcessFailure("unhandledRejection", reason);
 });
+
+try {
+  defaultUserDataPath = selectStartupDataPath({
+    packaged: app.isPackaged,
+    executablePath: process.execPath,
+    appDataPath: app.getPath("appData"),
+    explicit: app.commandLine.hasSwitch("user-data-dir") ? app.commandLine.getSwitchValue("user-data-dir") : undefined
+  });
+  prepareStartupDataPath(defaultUserDataPath);
+  app.setPath("userData", defaultUserDataPath);
+  gotSingleInstanceLock = app.requestSingleInstanceLock();
+} catch (error) {
+  handleStartupFailure(error, true);
+}
 
 process.on("exit", (exitCode) => {
   lifecyclePhase = "exiting";
@@ -142,14 +151,19 @@ function appendMainProcessLog(source, error) {
   } catch {}
 }
 
-function handleStartupFailure(error) {
+function handleStartupFailure(error, storageFailure = false) {
   appendMainProcessLog("startupFailure", error);
+  try {
+    fs.mkdirSync(path.dirname(startupLogPath), { recursive: true });
+    fs.writeFileSync(startupLogPath, `[${beijingTimestamp()}] ${formatMainProcessError(error)}\n`, "utf8");
+  } catch {}
   recordLifecycle("fatal_error", "startup_failure", "startup");
-  dialog.showErrorBox(
-    "Secure Codex Switcher 无法启动",
-    "本地账号数据损坏且无法自动恢复。损坏文件已保留，请先恢复账号数据后再启动。"
-  );
-  app.exit(1);
+  try {
+    dialog.showErrorBox(
+      "Secure Codex Switcher 无法启动 / Unable to start",
+      `${startupFailureMessage(error, defaultUserDataPath, storageFailure)}\n\nDiagnostic log (if writable): ${startupLogPath}`
+    );
+  } finally { app.exit(1); }
 }
 
 function createMainWindow() {
@@ -1128,17 +1142,8 @@ function getRuntimeVersion() {
 }
 
 function resolveUserDataPath() {
-  try {
-    if (app.commandLine.hasSwitch("user-data-dir")) {
-      const explicitPath = app.commandLine.getSwitchValue("user-data-dir").trim();
-      if (explicitPath) return path.resolve(explicitPath.replace(/^"(.*)"$/, "$1"));
-    }
-  } catch {}
   if (defaultUserDataPath) return defaultUserDataPath;
-  try {
-    return app.getPath("userData");
-  } catch {}
-  return path.join(process.env.APPDATA || __dirname, "secure-codex-switcher-win");
+  return path.dirname(startupLogPath);
 }
 
 function assertRecoveryOperationId(operationId) {

@@ -27,17 +27,17 @@ test("automatic continuation stays in Codex Desktop so approvals remain interact
   assert.match(main, /resumeInterruptedAutoResume\(\)/);
 });
 
-test("packaged app keeps private state on the formal executable drive", () => {
-  assert.match(main, /D:\\\\Secure Codex Switcher Workspace\\\\Data/);
+test("packaged app initializes selected storage before taking the instance lock", () => {
+  assert.match(main, /selectStartupDataPath/);
+  assert.match(main, /prepareStartupDataPath\(defaultUserDataPath\)[\s\S]*app\.setPath\("userData", defaultUserDataPath\)[\s\S]*app\.requestSingleInstanceLock/);
   assert.match(main, /app\.commandLine\.hasSwitch\("user-data-dir"\)/);
   assert.match(main, /app\.isPackaged/);
-  assert.match(main, /Secure Codex Switcher Workspace/);
   assert.doesNotMatch(main, /Secure Codex Switcher Data/);
 });
 
 test("unrecoverable local account state shows an actionable startup dialog", () => {
   assert.match(main, /dialog\.showErrorBox/);
-  assert.match(main, /本地账号数据损坏且无法自动恢复/);
+  assert.match(main, /startupFailureMessage/);
   assert.match(main, /app\.whenReady\(\)[\s\S]*\.catch\(/);
 });
 

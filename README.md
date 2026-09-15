@@ -8,7 +8,8 @@ Secure Codex Switcher is an independent, local-only Windows desktop application 
 
 ## Release
 
-- Current version: **v2.19.8**, with a Windows x64 installer.
+- Ordinary Windows installations now use per-user AppData instead of requiring a writable D drive. Startup storage errors show a diagnostic message.
+- Current version: **v2.19.9**, with a Windows x64 installer.
 - Pending-switch status remains stable during quota refresh; long notices and diagnostics scroll within a fixed-height status region so the account list does not jump.
 - New Switcher logs, displayed times and report/token calendar boundaries use Beijing time (UTC+08:00), independently of the host timezone. Historical logs and Codex-owned records are preserved.
 - Platform: Windows x64
@@ -38,7 +39,7 @@ Published installers, when available, are on [GitHub Releases](https://github.co
 
 ## Installation
 
-1. Download the Windows x64 installer from [v2.19.8](https://github.com/fbpuff/secure-codex-switcher-win/releases/tag/v2.19.8), or build this source version using the instructions below.
+1. Download the Windows x64 installer from [v2.19.9](https://github.com/fbpuff/secure-codex-switcher-win/releases/tag/v2.19.9), or build this source version using the instructions below.
 2. Compare its SHA-256 value with `SHA256SUMS.txt`.
 3. Run the installer and choose an installation directory.
 4. Start **Codex Switcher** from the desktop or Start menu.
@@ -70,7 +71,7 @@ Generated packages are written to `dist/` and are excluded from Git.
 
 For this privacy-filtered public snapshot, use `npm run package:public` instead of `package:win` or `package:dir`. The latter are internal formal-delivery checks that require private development ancestry, which is intentionally not published. Public builds are community builds and do not carry the internal formal-install provenance claim. Do not disable these checks in an internal checkout.
 
-The default packaged data path and launcher use `D:\Secure Codex Switcher Workspace\Data` and `D:\Secure Codex Switcher Workspace\Program`. Choose that layout when using the provided launcher, or pass `--user-data-dir="<your local data directory>"` to the packaged executable. The path is a product default, not an uploaded user profile.
+Ordinary installations store data in `%APPDATA%\secure-codex-switcher-win`. An explicit absolute `--user-data-dir="<your local data directory>"` takes priority. Existing internal installations in `D:\Secure Codex Switcher Workspace\Program` retain the adjacent `Data` directory when account/settings files exist; the internal launcher also specifies that path explicitly. No account data is automatically migrated. If startup fails, read the displayed error and, when available, `%TEMP%\secure-codex-switcher-win\startup.log`. Do not run as administrator merely to work around a data-directory error.
 
 ## Account Import And Storage
 

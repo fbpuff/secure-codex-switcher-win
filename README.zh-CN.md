@@ -8,7 +8,8 @@ Secure Codex Switcher 是一个独立、仅在本机运行的 Windows 桌面程�
 
 ## 发布版本
 
-- 当前版本：**v2.19.8**，提供 Windows x64 安装包。
+- 普通 Windows 安装默认使用当前用户 AppData，不再要求存在可写的 D 盘；启动目录不可用时会显示诊断提示。
+- 当前版本：**v2.19.9**，提供 Windows x64 安装包。
 - 修复切号前额度刷新导致状态提示反复变化、账号列表上下跳动的问题；长提示和诊断详情在固定高度的状态区内滚动。
 - Switcher 新日志与界面时间统一使用北京时间（UTC+08:00），日报、周报和 token 日期归属不跟随电脑时区；历史日志和 Codex 原始记录保留原样。
 - 平台：Windows x64
@@ -38,7 +39,7 @@ Secure Codex Switcher 是一个独立、仅在本机运行的 Windows 桌面程�
 
 ## 安装
 
-1. 从 [v2.19.8 Release](https://github.com/fbpuff/secure-codex-switcher-win/releases/tag/v2.19.8) 下载 Windows x64 安装包，或按下方说明自行构建当前源码。
+1. 从 [v2.19.9 Release](https://github.com/fbpuff/secure-codex-switcher-win/releases/tag/v2.19.9) 下载 Windows x64 安装包，或按下方说明自行构建当前源码。
 2. 与 `SHA256SUMS.txt` 中的 SHA-256 值进行比较。
 3. 运行安装程序并选择安装目录。
 4. 从桌面或开始菜单启动 **Codex Switcher**。
@@ -70,7 +71,7 @@ npm run package:public
 
 此经过隐私筛选的公开快照使用 `npm run package:public` 构建。`package:win` 和 `package:dir` 是内部正式交付检查，依赖未公开的私人开发历史；保留这些保护，不在内部源码中绕过检查。公开构建属于社区构建，不代表通过内部正式安装来源核验。
 
-打包版默认数据路径为 `D:\Secure Codex Switcher Workspace\Data`，启动脚本默认程序路径为 `D:\Secure Codex Switcher Workspace\Program`。使用所附启动脚本时应采用该布局，或向打包后的可执行文件传入 `--user-data-dir="<你的本地数据目录>"`。这是产品默认路径，不是上传的个人用户目录。
+普通安装的数据目录为 `%APPDATA%\secure-codex-switcher-win`。显式绝对路径参数 `--user-data-dir="<本机数据目录>"` 优先。既有内部安装位于 `D:\Secure Codex Switcher Workspace\Program` 且相邻 `Data` 存在账号或设置文件时，继续使用旧目录；内部启动器也显式指定此路径。不自动迁移账号数据。启动失败时查看错误框，以及可写时生成的 `%TEMP%\secure-codex-switcher-win\startup.log`。不要仅为绕过目录错误而以管理员身份运行。
 
 ## 账号导入与存储
 
