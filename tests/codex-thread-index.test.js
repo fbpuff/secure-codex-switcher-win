@@ -294,27 +294,27 @@ test("uses Codex project assignment metadata and normalizes the task directory",
       "local-projects": {
         "project-switcher": {
           id: "project-switcher",
-          name: "Secure Codex Switcher Workspace",
-          rootPaths: ["D:\\Secure Codex Switcher Workspace"]
+          name: "Synthetic Switcher Workspace",
+          rootPaths: ["D:\\Synthetic Switcher Workspace"]
         }
       },
       "thread-project-assignments": {
         "thread-project": {
           projectKind: "local",
           projectId: "project-switcher",
-          cwd: "\\\\?\\D:\\Secure Codex Switcher Workspace"
+          cwd: "\\\\?\\D:\\Synthetic Switcher Workspace"
         }
       }
     }),
     "utf8"
   );
 
-  assert.deepEqual(searchLocalCodexThreads(codexDir, "secure codex"), [{
+  assert.deepEqual(searchLocalCodexThreads(codexDir, "synthetic switcher"), [{
     id: "thread-project",
     title: "稳定项目标题",
-    workspacePath: "D:\\Secure Codex Switcher Workspace",
+    workspacePath: "D:\\Synthetic Switcher Workspace",
     projectId: "project-switcher",
-    projectName: "Secure Codex Switcher Workspace",
+    projectName: "Synthetic Switcher Workspace",
     createdAtMs: 100,
     updatedAtMs: 200,
     archived: false,

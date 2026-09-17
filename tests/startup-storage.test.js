@@ -13,10 +13,10 @@ test("explicit paths with spaces and unicode win, but empty and relative paths f
   assert.equal(selectStartupDataPath({ ...ordinary, explicit: '"C:\\用户 数据\\Switcher"' }), "C:\\用户 数据\\Switcher");
   for (const explicit of ["", " ", '""', "relative", "D:relative"]) assert.throws(() => selectStartupDataPath({ ...ordinary, explicit }), /absolute|绝对/);
 });
-test("legacy storage is retained only for internal executable with existing data", () => {
-  const internal = { ...ordinary, executablePath: "d:\\secure codex switcher workspace\\program\\Secure Codex Switcher.exe" };
-  assert.equal(selectStartupDataPath({ ...internal, exists: p => p.endsWith("settings.json") }), "D:\\Secure Codex Switcher Workspace\\Data");
-  assert.equal(selectStartupDataPath({ ...internal, exists: () => false }), selectStartupDataPath(ordinary));
+test("relocated installations use AppData unless their existing data is explicitly selected", () => {
+  const relocated = { ...ordinary, executablePath: "E:\\Synthetic Workspace\\Program\\Secure Codex Switcher.exe" };
+  assert.equal(selectStartupDataPath(relocated), selectStartupDataPath(ordinary));
+  assert.equal(selectStartupDataPath({ ...relocated, explicit: "E:\\Synthetic Workspace\\Data" }), "E:\\Synthetic Workspace\\Data");
 });
 test("directory probe leaves existing data intact and does not leave a probe file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "switcher-storage-test-"));

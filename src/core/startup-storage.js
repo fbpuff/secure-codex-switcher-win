@@ -2,17 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-export function selectStartupDataPath({ platform = process.platform, packaged, executablePath, appDataPath, explicit, exists = fs.existsSync }) {
+export function selectStartupDataPath({ platform = process.platform, appDataPath, explicit }) {
   const paths = platform === "win32" ? path.win32 : path;
   if (explicit !== undefined) {
     const value = String(explicit).trim().replace(/^"(.*)"$/, "$1");
     if (!value || !paths.isAbsolute(value)) throw new Error("--user-data-dir requires an absolute path / 需要非空绝对路径");
     return paths.normalize(value);
   }
-  const legacy = "D:\\Secure Codex Switcher Workspace\\Data";
-  if (platform === "win32" && packaged
-      && paths.dirname(paths.resolve(executablePath)).toLowerCase() === "d:\\secure codex switcher workspace\\program"
-      && ["accounts-store.json", "settings.json"].some(name => exists(paths.join(legacy, name)))) return legacy;
   return paths.join(appDataPath, "secure-codex-switcher-win");
 }
 

@@ -9,9 +9,9 @@ import { fileURLToPath } from "node:url";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const verifier = path.join(repoRoot, "scripts", "verify-formal-install.ps1");
 const verifierSource = fs.readFileSync(verifier, "utf8");
-const sourceRoot = String.raw`D:\Secure Codex Switcher Workspace\Source`;
-const installRoot = String.raw`D:\Secure Codex Switcher Workspace\Program`;
-const userDataPath = String.raw`D:\Secure Codex Switcher Workspace\Data`;
+const sourceRoot = String.raw`E:\Synthetic Workspace\Source`;
+const installRoot = String.raw`E:\Synthetic Workspace\Program`;
+const userDataPath = String.raw`E:\Synthetic Workspace\Data`;
 const executable = path.win32.join(installRoot, "Secure Codex Switcher.exe");
 const appAsar = path.win32.join(installRoot, "resources", "app.asar");
 const shortcutIcon = path.win32.join(installRoot, "resources", "shortcut-icon-2.5.2.ico");
@@ -114,9 +114,13 @@ function verify(snapshot, extraArgs = []) {
   }
 }
 
-test("formal verifier defaults to the consolidated Program directory", () => {
-  assert.match(verifierSource, /D:\\Secure Codex Switcher Workspace\\Program/);
-  assert.doesNotMatch(verifierSource, /D:\\Programs\\Secure Codex Switcher/);
+test("formal verifier rejects missing or relative path parameters before probing an installation", () => {
+  assert.doesNotMatch(verifierSource, /\b[A-Z]:\\[A-Za-z]/);
+  for (const args of [[], ["-InstallRoot", installRoot, "-UserDataPath", "relative"]]) {
+    const result = spawnSync("pwsh", ["-NoProfile", "-NonInteractive", "-File", verifier, ...args], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /requires an explicit absolute path/);
+  }
 });
 
 test("accepts a complete formal NSIS installation snapshot", () => {
@@ -338,7 +342,7 @@ test("rejects a renderer loading app.asar outside the formal install", () => {
     processId: 101,
     parentProcessId: 100,
     executablePath: executable,
-    commandLine: `"${executable}" --type=renderer --user-data-dir="${userDataPath}" --app-path="D:\\Secure Codex Switcher Workspace\\Source\\dist\\win-unpacked\\resources\\app.asar"`,
+    commandLine: `"${executable}" --type=renderer --user-data-dir="${userDataPath}" --app-path="${sourceRoot}\\dist\\win-unpacked\\resources\\app.asar"`,
   });
 
   const result = verify(snapshot, ["-RequireRunning"]);

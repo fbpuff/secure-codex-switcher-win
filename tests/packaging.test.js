@@ -42,27 +42,27 @@ test("unrecoverable local account state shows an actionable startup dialog", () 
 });
 
 test("standard launcher uses packaged executable and development is explicit", () => {
-  assert.match(launcher, /D:\\Secure Codex Switcher Workspace\\Program/);
-  assert.match(launcher, /\$userDataPath\s*=\s*"D:\\Secure Codex Switcher Workspace\\Data"/);
+  assert.match(launcher, /Resolve-SwitcherLaunchPaths/);
+  assert.match(launcher, /\$env:APPDATA/);
   assert.match(launcher, /--user-data-dir=.*\$userDataPath/);
   assert.doesNotMatch(launcher, /D:\\Programs\\Secure Codex Switcher/);
   assert.match(launcher, /Secure Codex Switcher\.exe/);
-  assert.doesNotMatch(launcher, /LOCALAPPDATA/);
+  assert.match(launcher, /\$env:LOCALAPPDATA/);
   assert.doesNotMatch(launcher, /C:\\Users|AppData\\Local\\Programs/);
   assert.doesNotMatch(launcher, /dist\\win-unpacked\\Secure Codex Switcher\.exe/);
   assert.doesNotMatch(launcher, /node_modules\\electron/);
   assert.match(launcher, /shortcut-icon-2\.5\.2\.ico/);
-  assert.match(launcher, /D:\\Secure Codex Switcher Workspace\\Data/);
+  assert.match(launcher, /\[Alias\("user-data-dir"\)\]/);
   assert.match(launcher, /ie4uinit\.exe/);
   assert.equal(fs.existsSync(new URL("../Start-CodexSwitcher-Dev.ps1", import.meta.url)), true);
 });
 
-test("formal verifier and maintained launch files reject retired paths", () => {
-  assert.match(verifier, /D:\\Secure Codex Switcher Workspace\\Program/);
-  assert.match(verifier, /D:\\Secure Codex Switcher Workspace\\Data/);
+test("formal verifier requires explicit paths and maintained launch files have no fixed drive roots", () => {
+  assert.match(verifier, /\[string\]\$InstallRoot,/);
+  assert.match(verifier, /\[string\]\$UserDataPath,/);
+  assert.match(verifier, /requires an explicit absolute path/);
   for (const content of [main, launcher, verifier]) {
-    assert.doesNotMatch(content, /D:\\Programs\\Secure Codex Switcher/);
-    assert.doesNotMatch(content, /D:\\Secure Codex Switcher Data/);
+    assert.doesNotMatch(content, /\b[A-Z]:\\[A-Za-z]/);
   }
 });
 

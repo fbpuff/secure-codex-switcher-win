@@ -71,7 +71,11 @@ Generated packages are written to `dist/` and are excluded from Git.
 
 For this privacy-filtered public snapshot, use `npm run package:public` instead of `package:win` or `package:dir`. The latter are internal formal-delivery checks that require private development ancestry, which is intentionally not published. Public builds are community builds and do not carry the internal formal-install provenance claim. Do not disable these checks in an internal checkout.
 
-Ordinary installations store data in `%APPDATA%\secure-codex-switcher-win`. An explicit absolute `--user-data-dir="<your local data directory>"` takes priority. Existing internal installations in `D:\Secure Codex Switcher Workspace\Program` retain the adjacent `Data` directory when account/settings files exist; the internal launcher also specifies that path explicitly. No account data is automatically migrated. If startup fails, read the displayed error and, when available, `%TEMP%\secure-codex-switcher-win\startup.log`. Do not run as administrator merely to work around a data-directory error.
+Ordinary installations store data in `%APPDATA%\secure-codex-switcher-win`. An explicit absolute `--user-data-dir="<your local data directory>"` takes priority. Users of an older custom or internal data directory must explicitly select that existing directory; startup no longer infers it from a maintainer-specific installation location. No account data is automatically migrated. If startup fails, read the displayed error and, when available, `%TEMP%\secure-codex-switcher-win\startup.log`. Do not run as administrator merely to work around a data-directory error.
+
+`Start-CodexSwitcher.ps1` accepts `-InstallRoot` and `-UserDataPath` (alias `-user-data-dir`). Without an install path, it checks for the executable beside the script, then existing shortcuts, Windows uninstall registration, and the per-user Programs directory. Ambiguous installations require an explicit path. Existing matching shortcuts retain their custom data directory unless overridden; otherwise the launcher uses AppData. It preserves Windows proxy inheritance and repairs shortcuts before launching. These source changes do not alter already published installers.
+
+Internal formal-install verification requires explicit absolute `-InstallRoot` and `-UserDataPath` parameters; its provenance, hash, shortcut, and process checks remain in force.
 
 ## Account Import And Storage
 

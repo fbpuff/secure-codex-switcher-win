@@ -1,10 +1,73 @@
-$ErrorActionPreference = "Stop"
+param(
+  [string]$InstallRoot,
+  [Alias("user-data-dir")][string]$UserDataPath
+)
 
-$installedRoot = "D:\Secure Codex Switcher Workspace\Program"
-$packagedExe = Join-Path $installedRoot "Secure Codex Switcher.exe"
-$shortcutIcon = Join-Path $installedRoot "resources\shortcut-icon-2.5.2.ico"
-$userDataPath = "D:\Secure Codex Switcher Workspace\Data"
+$ErrorActionPreference = "Stop"
 $logPath = Join-Path $env:TEMP "codex-switcher-launch.log"
+
+function Get-InstalledSwitcherCandidates {
+  $shell = New-Object -ComObject WScript.Shell
+  foreach ($directory in @([Environment]::GetFolderPath("Desktop"), [Environment]::GetFolderPath("Programs"))) {
+    foreach ($name in @("Codex Switcher.lnk", "Secure Codex Switcher.lnk")) {
+      $shortcutPath = Join-Path $directory $name
+      if (-not (Test-Path -LiteralPath $shortcutPath)) { continue }
+      $shortcut = $shell.CreateShortcut($shortcutPath)
+      if ([IO.Path]::GetFileName($shortcut.TargetPath) -ne "Secure Codex Switcher.exe") { continue }
+      $match = [regex]::Match($shortcut.Arguments, '(?:^|\s)--user-data-dir=(?:"(?<quoted>[^"]+)"|(?<bare>\S+))')
+      $dataPath = if ($match.Groups['quoted'].Success) { $match.Groups['quoted'].Value } else { $match.Groups['bare'].Value }
+      [pscustomobject]@{ Root = Split-Path -Parent $shortcut.TargetPath; DataPath = $dataPath }
+    }
+  }
+  foreach ($registryRoot in @(
+    "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
+    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
+    "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+  )) {
+    Get-ChildItem -LiteralPath $registryRoot -ErrorAction SilentlyContinue | ForEach-Object {
+      $entry = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+      if ($entry.DisplayName -ne "Secure Codex Switcher") { return }
+      $root = $entry.InstallLocation
+      if (-not $root) {
+        $match = [regex]::Match([string]$entry.UninstallString, '^\s*"(?<path>[^"]+\\Uninstall Secure Codex Switcher\.exe)"')
+        if ($match.Success) { $root = Split-Path -Parent $match.Groups['path'].Value }
+      }
+      if ($root) { [pscustomobject]@{ Root = $root; DataPath = $null } }
+    }
+  }
+}
+
+function Resolve-SwitcherLaunchPaths($InstallRoot, $UserDataPath, $ScriptRoot, $AppData, $LocalAppData, $Candidates) {
+  if ($InstallRoot) {
+    $root = $InstallRoot
+  } elseif (Test-Path -LiteralPath (Join-Path $ScriptRoot "Secure Codex Switcher.exe") -PathType Leaf) {
+    $root = $ScriptRoot
+  } else {
+    $possibleRoots = @($Candidates | ForEach-Object { $_.Root })
+    if ($LocalAppData) { $possibleRoots += Join-Path $LocalAppData "Programs\Secure Codex Switcher" }
+    $roots = @($possibleRoots | Where-Object {
+      $_ -and (Test-Path -LiteralPath (Join-Path $_ "Secure Codex Switcher.exe") -PathType Leaf)
+    } | ForEach-Object { [IO.Path]::GetFullPath($_).TrimEnd('\') } | Sort-Object -Unique)
+    if ($roots.Count -ne 1) { throw "Cannot uniquely find the installed application. Specify -InstallRoot explicitly." }
+    $root = $roots[0]
+  }
+  if ($root -notmatch '^(?:[A-Za-z]:\\|\\\\[^\\]+\\[^\\]+)') { throw "-InstallRoot requires an absolute path." }
+  $root = [IO.Path]::GetFullPath($root).TrimEnd('\')
+  $exe = Join-Path $root "Secure Codex Switcher.exe"
+  if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Cannot find the installed application: $exe" }
+  if (-not $UserDataPath) {
+    $savedPaths = @($Candidates | Where-Object { $_.Root -and [IO.Path]::GetFullPath($_.Root).TrimEnd('\') -eq $root -and $_.DataPath } |
+      ForEach-Object { $_.DataPath } | Sort-Object -Unique)
+    if ($savedPaths.Count -gt 1) { throw "Conflicting shortcut data directories. Specify -UserDataPath explicitly." }
+    if ($savedPaths.Count -eq 1) { $UserDataPath = $savedPaths[0] }
+    elseif ($AppData) { $UserDataPath = Join-Path $AppData "secure-codex-switcher-win" }
+    else { throw "APPDATA is unavailable. Specify -UserDataPath explicitly." }
+  }
+  if ($UserDataPath -notmatch '^(?:[A-Za-z]:\\|\\\\[^\\]+\\[^\\]+)' -or $UserDataPath.Contains('"')) {
+    throw "-UserDataPath requires an absolute path without embedded quotes."
+  }
+  [pscustomobject]@{ InstallRoot = $root; UserDataPath = [IO.Path]::GetFullPath($UserDataPath); Executable = $exe }
+}
 
 function Show-LaunchError($message) {
   try {
@@ -74,8 +137,14 @@ function Start-DetachedSwitcher {
   }
 }
 
-if (-not (Test-Path -LiteralPath $packagedExe)) {
-  Show-LaunchError "Cannot find the installed application:`n$packagedExe`n`nInstall the latest Secure Codex Switcher release first. Development builds are available only through Start-CodexSwitcher-Dev.ps1."
+try {
+  $paths = Resolve-SwitcherLaunchPaths $InstallRoot $UserDataPath $PSScriptRoot $env:APPDATA $env:LOCALAPPDATA @(Get-InstalledSwitcherCandidates)
+  $installedRoot = $paths.InstallRoot
+  $userDataPath = $paths.UserDataPath
+  $packagedExe = $paths.Executable
+  $shortcutIcon = Join-Path $installedRoot "resources\shortcut-icon-2.5.2.ico"
+} catch {
+  Show-LaunchError "$($_.Exception.Message)`n`nInstall the latest release or specify -InstallRoot and -UserDataPath. Development builds are available only through Start-CodexSwitcher-Dev.ps1."
   exit 1
 }
 

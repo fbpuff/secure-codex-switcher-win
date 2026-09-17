@@ -1,12 +1,19 @@
 param(
   [string]$SourceRoot = (Split-Path -Parent $PSScriptRoot),
-  [string]$InstallRoot = "D:\Secure Codex Switcher Workspace\Program",
-  [string]$UserDataPath = "D:\Secure Codex Switcher Workspace\Data",
+  [string]$InstallRoot,
+  [string]$UserDataPath,
   [string]$SnapshotPath,
   [switch]$RequireRunning
 )
 
 $ErrorActionPreference = "Stop"
+
+foreach ($parameter in @("InstallRoot", "UserDataPath")) {
+  $value = Get-Variable -Name $parameter -ValueOnly
+  if ([string]::IsNullOrWhiteSpace($value) -or $value -notmatch '^(?:[A-Za-z]:\\|\\\\[^\\]+\\[^\\]+)') {
+    throw "-$parameter requires an explicit absolute path."
+  }
+}
 
 function Read-Shortcut($Path, $Shell) {
   if (-not (Test-Path -LiteralPath $Path)) {

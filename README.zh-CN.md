@@ -71,7 +71,11 @@ npm run package:public
 
 此经过隐私筛选的公开快照使用 `npm run package:public` 构建。`package:win` 和 `package:dir` 是内部正式交付检查，依赖未公开的私人开发历史；保留这些保护，不在内部源码中绕过检查。公开构建属于社区构建，不代表通过内部正式安装来源核验。
 
-普通安装的数据目录为 `%APPDATA%\secure-codex-switcher-win`。显式绝对路径参数 `--user-data-dir="<本机数据目录>"` 优先。既有内部安装位于 `D:\Secure Codex Switcher Workspace\Program` 且相邻 `Data` 存在账号或设置文件时，继续使用旧目录；内部启动器也显式指定此路径。不自动迁移账号数据。启动失败时查看错误框，以及可写时生成的 `%TEMP%\secure-codex-switcher-win\startup.log`。不要仅为绕过目录错误而以管理员身份运行。
+普通安装的数据目录为 `%APPDATA%\secure-codex-switcher-win`。显式绝对路径参数 `--user-data-dir="<本机数据目录>"` 优先。使用旧自定义或内部数据目录的用户必须显式指定原目录；启动时不再根据维护者特定安装位置推断数据目录。不自动迁移账号数据。启动失败时查看错误框，以及可写时生成的 `%TEMP%\secure-codex-switcher-win\startup.log`。不要仅为绕过目录错误而以管理员身份运行。
+
+`Start-CodexSwitcher.ps1` 接受 `-InstallRoot` 和 `-UserDataPath`（别名 `-user-data-dir`）。未指定安装目录时，先检查脚本旁的程序，再检查既有快捷方式、Windows 卸载注册信息和当前用户的 Programs 目录；存在多个候选时要求显式指定路径。匹配的既有快捷方式中自定义数据目录会保留，显式参数可覆盖；否则使用 AppData。保留 Windows 代理继承及启动前快捷方式修复。这些源码变更不会改变已发布的安装包。
+
+内部正式安装验证须显式传入绝对路径 `-InstallRoot` 和 `-UserDataPath`；来源、哈希、快捷方式和进程检查保持有效。
 
 ## 账号导入与存储
 
