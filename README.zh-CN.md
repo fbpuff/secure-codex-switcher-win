@@ -228,4 +228,4 @@ npm audit --omit=dev
 
 ## 许可证
 
-当前仓库没有包含许可证文件。在添加许可证之前，著作权法默认保留复用和再分发权利。
+本项目采用 MIT License 开源。详细内容请参阅 [LICENSE](LICENSE)。

@@ -228,4 +228,4 @@ This release targets one local Windows user and the installed ChatGPT Codex desk
 
 ## License
 
-No license file is currently included. Unless a license is added, copyright law reserves reuse and redistribution rights.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

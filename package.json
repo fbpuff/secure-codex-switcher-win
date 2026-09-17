@@ -3,6 +3,7 @@
   "productName": "Secure Codex Switcher",
   "version": "2.19.9",
   "private": true,
+  "license": "MIT",
   "author": "Secure Codex Switcher Contributors",
   "description": "A local-only Windows Codex account switcher with encrypted account storage and usage-aware switching.",
   "type": "module",
