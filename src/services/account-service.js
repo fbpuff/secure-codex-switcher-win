@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { continuationDiagnosticsScript, normalizeContinuationFocusDiagnostics } from "./continuation-diagnostics.js";
+import { continuationWindowScript } from "./continuation-window.js";
 import { beijingTimestamp, beijingDayStart } from "../core/beijing-time.js";
 import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -2956,7 +2958,7 @@ class AccountService {
           currentOperation = this.openCodexThread(threadId, {
             onPhase, evidenceStartedAtMs,
             onDiagnostic: (details) => this.writeAutoSwitchEvent("continuation_desktop_discovery", {
-              threadId, ...normalizeDesktopDiscoveryDiagnostics(details)
+              threadId, attempt: attemptIndex + 1, ...normalizeDesktopDiscoveryDiagnostics(details)
             })
           });
           observed = await currentOperation === true;
@@ -5549,7 +5551,7 @@ function launchOfficialCodex(options = {}) {
 }
 
 export function normalizeDesktopDiscoveryDiagnostics(value) {
-  const result = {};
+  const result = normalizeContinuationFocusDiagnostics(value);
   for (const key of ["warmupScans", "warmupReady"]) {
     if (Number.isSafeInteger(value?.[key]) && value[key] >= 0) result[key] = Math.min(value[key], 100_000);
   }
@@ -5570,7 +5572,8 @@ function submitOfficialCodexContinuation(threadId, options = {}) {
   let child;
   let phaseBuffer = "";
   const operation = new Promise((resolve) => {
-    child = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", script], {
+    // stdin avoids the Windows command-line ceiling as diagnostic helpers grow.
+    child = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", "$ErrorActionPreference='Stop'; & ([scriptblock]::Create([Console]::In.ReadToEnd()))"], {
       encoding: "utf8",
       windowsHide: true,
       timeout: AUTO_RESUME_DESKTOP_PROCESS_MS
@@ -5597,6 +5600,8 @@ function submitOfficialCodexContinuation(threadId, options = {}) {
         try { options.onPhase?.(phase); } catch {}
       }
     });
+    child.stdin?.on?.("error", () => {}); // Exit/timeout is reported by execFile.
+    child.stdin?.end(script);
   });
   operation.cancel = () => {
     try { child?.kill(); } catch {}
@@ -5655,6 +5660,8 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
   const evidenceStartedAtIso = new Date(finiteTime(options.evidenceStartedAtMs) ?? Date.now()).toISOString();
   return [
     "$ErrorActionPreference = 'Stop'",
+    continuationDiagnosticsScript,
+    continuationWindowScript,
     "Add-Type -AssemblyName UIAutomationClient",
     "Add-Type -AssemblyName UIAutomationTypes",
     "Add-Type @'",
@@ -5666,6 +5673,10 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "  public static extern bool SetForegroundWindow(IntPtr hWnd);",
     "  [DllImport(\"user32.dll\")]",
     "  public static extern IntPtr GetForegroundWindow();",
+    "  [DllImport(\"user32.dll\")] public static extern IntPtr GetAncestor(IntPtr h, uint flags);",
+    "  [DllImport(\"user32.dll\")] public static extern IntPtr GetWindow(IntPtr h, uint cmd);",
+    "  [DllImport(\"user32.dll\")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);",
+    "  public static uint Pid(IntPtr h) { uint pid; GetWindowThreadProcessId(h, out pid); return pid; }",
     "  [DllImport(\"user32.dll\")]",
     "  [return: MarshalAs(UnmanagedType.Bool)]",
     "  public static extern bool IsIconic(IntPtr hWnd);",
@@ -5884,6 +5895,7 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "$previousForeground = [CodexForegroundWindow]::GetForegroundWindow()",
     "$windowHandle = [IntPtr]::Zero",
     "try {",
+    "Start-ContinuationDiagnostics",
     "$desktop = [System.Windows.Automation.AutomationElement]::RootElement",
     "Wait-ContinuationAccessibility $desktop",
     "if (Test-ContinuationTurnStarted $rollouts $continuationStartedAtUtc $prompt) { Write-Output 'turn_started'; exit 0 }",
@@ -5960,10 +5972,13 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "Write-ContinuationPhase 'window_restored'",
     "Write-ContinuationPhase 'composer_found'",
     "Write-ContinuationPhase 'submit_found'",
-    "  [CodexForegroundWindow]::SetForegroundWindow($windowHandle) | Out-Null",
+    "  Write-ContinuationFocusDiagnostic 'before_activate'",
+    "  $setForegroundResult = [CodexForegroundWindow]::SetForegroundWindow($windowHandle)",
+    "  Write-ContinuationFocusDiagnostic 'after_activate' $setForegroundResult",
     "  $composer.SetFocus()",
     "  Start-Sleep -Milliseconds 100",
-    "  if ([CodexForegroundWindow]::GetForegroundWindow() -ne $windowHandle) { throw 'Codex continuation window did not remain in the foreground.' }",
+    "  Write-ContinuationFocusDiagnostic 'after_focus'",
+    "  $windowHandle = Resolve-ContinuationForeground $composer $elementProcessId $prompt $windowHandle 'after_focus' $submit.Element",
     "  $focusedComposer = [System.Windows.Automation.AutomationElement]::FocusedElement",
     "  $focusedValue = Get-ContinuationComposerValue $focusedComposer",
     "  if ($null -eq $focusedValue) {",
@@ -5973,7 +5988,8 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "    throw 'Codex continuation composer focus did not match.'",
     "  }",
     "  Write-ContinuationPhase 'focus_verified'",
-    "  if ([CodexForegroundWindow]::GetForegroundWindow() -ne $windowHandle) { throw 'Codex continuation foreground changed before submission.' }",
+    "  Write-ContinuationFocusDiagnostic 'before_submit'",
+    "  $windowHandle = Resolve-ContinuationForeground $composer $elementProcessId $prompt $windowHandle 'before_submit' $submit.Element",
     "  $focusedComposer = [System.Windows.Automation.AutomationElement]::FocusedElement",
     "  $focusedValue = Get-ContinuationComposerValue $focusedComposer",
     "  if ($null -eq $focusedValue -or -not (Test-SameAutomationElement $focusedComposer $composer) -or -not (Test-ContinuationPromptValue $focusedValue $prompt)) {",
@@ -5982,6 +5998,7 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "  $submit = Find-ContinuationSubmit $composer $elementProcessId",
     "  if (-not $submit) { throw 'Codex continuation submit control was not found.' }",
     "  $primaryAction = $null",
+    "  $windowHandle = Resolve-ContinuationForeground $composer $elementProcessId $prompt $windowHandle 'before_submit' $submit.Element",
     "  Write-ContinuationPhase 'invoke_started'",
     "  $invokeUncertain = $false",
     "  if ($submit.Invoke) { $primaryAction = 'invoke'; try { $submit.Invoke.Invoke() } catch { $invokeUncertain = $true; Write-Output 'diagnostic:{\"invokeErrors\":1}' } }",
@@ -6000,7 +6017,8 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "  if ($primaryOutcome -eq 'turn_not_observed') { throw 'Codex continuation turn was not observed in the rollout.' }",
     "  Write-ContinuationPhase 'invoke_no_effect'",
     "  if (Test-ContinuationTurnStarted $rollouts $continuationStartedAtUtc $prompt) { Write-Output 'turn_started'; exit 0 }",
-    "  if ([CodexForegroundWindow]::GetForegroundWindow() -ne $windowHandle) { throw 'Codex continuation foreground changed before fallback submission.' }",
+    "  Write-ContinuationFocusDiagnostic 'before_fallback'",
+    "  $windowHandle = Resolve-ContinuationForeground $composer $elementProcessId $prompt $windowHandle 'before_fallback' $submit.Element",
     "  $focusedComposer = [System.Windows.Automation.AutomationElement]::FocusedElement",
     "  $focusedValue = Get-ContinuationComposerValue $focusedComposer",
     "  if ($null -eq $focusedValue -or -not (Test-SameAutomationElement $focusedComposer $composer) -or $focusedComposer.Current.ProcessId -ne $elementProcessId -or -not (Test-ContinuationPromptValue $focusedValue $prompt)) {",
@@ -6013,6 +6031,7 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "  if ($primaryAction -eq 'invoke' -and $fallbackSubmit.Element.TryGetClickablePoint([ref]$fallbackPoint)) { $fallbackAction = 'click' }",
     "  if (-not $fallbackAction) { throw 'Codex continuation prompt was not consumed and no independent fallback action was available.' }",
     "  if (Test-ContinuationTurnStarted $rollouts $continuationStartedAtUtc $prompt) { Write-Output 'turn_started'; exit 0 }",
+    "  $windowHandle = Resolve-ContinuationForeground $composer $elementProcessId $prompt $windowHandle 'before_fallback' $fallbackSubmit.Element",
     "  Write-ContinuationPhase 'fallback_invoke_started'",
     "    $previousCursor = [CodexForegroundWindow+POINT]::new()",
     "    $cursorCaptured = [CodexForegroundWindow]::GetCursorPos([ref]$previousCursor)",
@@ -6023,6 +6042,7 @@ export function buildCodexDesktopContinuationScript(threadId, options = {}) {
     "  if ($fallbackOutcome -eq 'prompt_not_consumed') { throw 'Codex continuation prompt was not consumed after fallback submission.' }",
     "  throw 'Codex continuation turn was not observed in the rollout.'",
     "} finally {",
+    "  Stop-ContinuationDiagnostics",
     "  Restore-ContinuationForeground $previousForeground $windowHandle",
     "}"
   ].join("\n");

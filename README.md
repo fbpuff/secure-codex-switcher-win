@@ -9,7 +9,7 @@ Secure Codex Switcher is an independent, local-only Windows desktop application 
 ## Release
 
 - Ordinary Windows installations now use per-user AppData instead of requiring a writable D drive. Startup storage errors show a diagnostic message.
-- Current version: **v2.19.9**, with a Windows x64 installer.
+- Current version: **v2.20.0**, with a Windows x64 installer.
 - Pending-switch status remains stable during quota refresh; long notices and diagnostics scroll within a fixed-height status region so the account list does not jump.
 - New Switcher logs, displayed times and report/token calendar boundaries use Beijing time (UTC+08:00), independently of the host timezone. Historical logs and Codex-owned records are preserved.
 - Platform: Windows x64
@@ -39,7 +39,7 @@ Published installers, when available, are on [GitHub Releases](https://github.co
 
 ## Installation
 
-1. Download the Windows x64 installer from [v2.19.9](https://github.com/fbpuff/secure-codex-switcher-win/releases/tag/v2.19.9), or build this source version using the instructions below.
+1. Download the Windows x64 installer from [v2.20.0](https://github.com/fbpuff/secure-codex-switcher-win/releases/tag/v2.20.0), or build this source version using the instructions below.
 2. Compare its SHA-256 value with `SHA256SUMS.txt`.
 3. Run the installer and choose an installation directory.
 4. Start **Codex Switcher** from the desktop or Start menu.
